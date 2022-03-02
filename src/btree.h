@@ -291,6 +291,14 @@ class BTreeIndex {
    */
 	Operator	highOp;
 
+  /**
+   * @brief private helper function to set the attributes of the BTree object
+   * 
+   * @param attrByteOffset - byte offset of attribute in RID
+   * @param attrType - Should always be INTEGER (defined in enum to be 0)
+   */
+  void setAttributes(const int attrByteOffset, const Datatype attrType);
+
 	
  public:
 
