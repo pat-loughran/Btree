@@ -128,6 +128,14 @@ struct IndexMetaInfo{
    * Page number of root page of the B+ Tree inside the file index file.
    */
 	PageId rootPageNo;
+
+  /**
+   * Number of pages that comprise btree file. Used to determine if
+   * btree is in special case where only one child node present as 
+   * due to implementation details of root being always nonleafnode,
+   * if there is only one child, this leaf node can have < 50% occupancy.
+   */
+  int numPages;
 };
 
 /*
@@ -228,6 +236,14 @@ class BTreeIndex {
    */
 	int			nodeOccupancy;
 
+  /**
+   * Number of pages that comprise btree file. Used to determine if
+   * btree is in special case where only one child node present as 
+   * due to implementation details of root being always nonleafnode,
+   * if there is only one child, this leaf node can have < 50% occupancy.
+   */
+  int numPages;
+
 
 	// MEMBERS SPECIFIC TO SCANNING
 
@@ -298,6 +314,13 @@ class BTreeIndex {
    * @param attrType - Should always be INTEGER (defined in enum to be 0)
    */
   void setAttributes(const int attrByteOffset, const Datatype attrType);
+
+  /**
+   * @brief private helper function to initalize a nonleafNode
+   * 
+   * @param nonLeafNode - node to be initalized
+   */
+  void initalizeNonLeafNode(NonLeafNodeInt* nonLeafNode);
 
 	
  public:
