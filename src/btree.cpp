@@ -35,6 +35,15 @@ void BTreeIndex::setAttributes(const int _attrByteOffset, const Datatype attrTyp
     nodeOccupancy = INTARRAYNONLEAFSIZE; // need to see if should be capacity or actual 
 }
 
+void initalizeNonLeafNode(NonLeafNodeInt* nonLeafNode) {
+    for (int i = 0; i <INTARRAYNONLEAFSIZE + 1; i++) {
+            if (i < INTARRAYNONLEAFSIZE) {
+                nonLeafNode->keyArray[i] = INT_MAX; // pre fill values
+            }
+            nonLeafNode->pageNoArray[i] = 0; // pre fill values
+        }
+}
+
 // -----------------------------------------------------------------------------
 // BTreeIndex::BTreeIndex -- Constructor
 // -----------------------------------------------------------------------------
@@ -66,8 +75,13 @@ BTreeIndex::BTreeIndex(const std::string & relationName,
         bufMgr->readPage(file, (PageId)1, metaPage); //read page
         IndexMetaInfo* metaInfo = reinterpret_cast<IndexMetaInfo*>(metaPage);
         rootPageNum = metaInfo->rootPageNo;
+        headerPageNum = (PageId)1; // possibly unnecsarry
+        numPages = metaInfo->numPages;
         bufMgr->unPinPage(file, (PageId)1, false); //unpin page
+
+        // set btree instance fields
         setAttributes(attrByteOffset, attrType);
+        
         return;
     }
     else {
@@ -86,7 +100,14 @@ BTreeIndex::BTreeIndex(const std::string & relationName,
         metaInfo->attrByteOffset = attrByteOffset;
         metaInfo->attrType = attrType;
         metaInfo->rootPageNo = (PageId)2; //might need to dynamically set this after root created
-        bufMgr->unPinPage(file,(PageId)1, true);
+        metaInfo->numPages = 2;
+        bufMgr->unPinPage(file, metaPageNo, true);
+
+        // set Btree instance fields
+        setAttributes(attrByteOffset, attrType);
+        numPages = 2;
+        headerPageNum = metaPageNo; // should be 1
+        rootPageNum = rootPageNum;  // should be 2
 
         //create root
         Page* root;
@@ -94,15 +115,11 @@ BTreeIndex::BTreeIndex(const std::string & relationName,
         bufMgr->allocPage(file, rootPageNo, root);
         NonLeafNodeInt* rootNode = reinterpret_cast<NonLeafNodeInt*>(root);
         rootNode->level = 1; // How will this be updated once height reaches 3?
-        for (int i = 0; i <INTARRAYNONLEAFSIZE + 1; i++) {
-            if (i < INTARRAYNONLEAFSIZE) {
-                rootNode->keyArray[i] = INT_MAX; // pre fill values
-            }
-            rootNode->pageNoArray[i] = 0; // pre fill values
-        }
+        initalizeNonLeafNode(rootNode);
         bufMgr->unPinPage(file, rootPageNo, true);
 
         //TODO Insert record IDs
+
     }
 }
 
