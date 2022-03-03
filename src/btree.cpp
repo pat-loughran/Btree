@@ -22,10 +22,64 @@
 namespace badgerdb
 {
 
+void BTreeIndex::handleAlreadyPresent(std::string indexName, BufMgr *bufMgrIn, const int _attrByteOffset, const Datatype attrType) {
+    // set file attribute to actual index
+        file = &BlobFile::open(indexName);
+
+        // set bufMgr attribute
+        bufMgr = bufMgrIn;
+
+        // read meta page from index to fill rootPageNum
+        Page* metaPage;
+        bufMgr->readPage(file, (PageId)1, metaPage); //read page
+        IndexMetaInfo* metaInfo = reinterpret_cast<IndexMetaInfo*>(metaPage);
+        rootPageNum = metaInfo->rootPageNo;
+        headerPageNum = (PageId)1; // possibly unnecsarry
+        numPages = metaInfo->numPages;
+        bufMgr->unPinPage(file, (PageId)1, false); //unpin page
+
+        // set btree instance fields
+        setAttributes(_attrByteOffset, attrType);
+}
+
+void BTreeIndex::handleNew(std::string indexName, BufMgr *bufMgrIn, const int _attrByteOffset, const Datatype attrType) {
+        //create actual Btree file in disc
+        file = &BlobFile::create(indexName);
+        
+        // set bufMgr attribute
+        bufMgr = bufMgrIn;
+
+        //create header 
+        Page* metaPage;
+        PageId metaPageNo; // should be 1
+        bufMgr->allocPage(file, metaPageNo, metaPage);
+        IndexMetaInfo* metaInfo = reinterpret_cast<IndexMetaInfo*>(metaPage);
+        //metaInfo->relationName = relationName.c_str(); Why does this give me an error
+        metaInfo->attrByteOffset = _attrByteOffset;
+        metaInfo->attrType = attrType;
+        metaInfo->rootPageNo = (PageId)2; //might need to dynamically set this after root created
+        metaInfo->numPages = 2;
+        bufMgr->unPinPage(file, metaPageNo, true);
+
+        // set Btree instance fields
+        setAttributes(_attrByteOffset, attrType);
+        numPages = 2;
+        headerPageNum = metaPageNo; // should be 1
+        rootPageNum = rootPageNum;  // should be 2
+
+        //create root
+        Page* root;
+        PageId rootPageNo;
+        bufMgr->allocPage(file, rootPageNo, root);
+        NonLeafNodeInt* rootNode = reinterpret_cast<NonLeafNodeInt*>(root);
+        rootNode->level = 1; // How will this be updated once height reaches 3?
+        initalizeNonLeafNode(rootNode);
+        bufMgr->unPinPage(file, rootPageNo, true);
+}
+
 // -----------------------------------------------------------------------------
 // BTreeIndex::setAttributes -- private helper
 // -----------------------------------------------------------------------------
- 
 void BTreeIndex::setAttributes(const int _attrByteOffset, const Datatype attrType)
 {
     headerPageNum = (PageId)1; // need to ask if this is always true
@@ -64,61 +118,30 @@ BTreeIndex::BTreeIndex(const std::string & relationName,
     
     // check if the index file already exists
     if (BlobFile::exists(indexName)) {
-        // set file attribute to actual index
-        file = &BlobFile::open(indexName);
-
-        // set bufMgr attribute
-        bufMgr = bufMgrIn;
-
-        // read meta page from index to fill rootPageNum
-        Page* metaPage;
-        bufMgr->readPage(file, (PageId)1, metaPage); //read page
-        IndexMetaInfo* metaInfo = reinterpret_cast<IndexMetaInfo*>(metaPage);
-        rootPageNum = metaInfo->rootPageNo;
-        headerPageNum = (PageId)1; // possibly unnecsarry
-        numPages = metaInfo->numPages;
-        bufMgr->unPinPage(file, (PageId)1, false); //unpin page
-
-        // set btree instance fields
-        setAttributes(attrByteOffset, attrType);
-        
+        handleAlreadyPresent(indexName, bufMgrIn, attrByteOffset, attrType);
         return;
     }
     else {
-        //create actual Btree file in disc
-        file = &BlobFile::create(indexName);
-        
-        // set bufMgr attribute
-        bufMgr = bufMgrIn;
+        handleNew(indexName, bufMgrIn, attrByteOffset, attrType);
 
-        //create header 
-        Page* metaPage;
-        PageId metaPageNo; // should be 1
-        bufMgr->allocPage(file, metaPageNo, metaPage);
-        IndexMetaInfo* metaInfo = reinterpret_cast<IndexMetaInfo*>(metaPage);
-        //metaInfo->relationName = relationName.c_str(); Why does this give me an error
-        metaInfo->attrByteOffset = attrByteOffset;
-        metaInfo->attrType = attrType;
-        metaInfo->rootPageNo = (PageId)2; //might need to dynamically set this after root created
-        metaInfo->numPages = 2;
-        bufMgr->unPinPage(file, metaPageNo, true);
-
-        // set Btree instance fields
-        setAttributes(attrByteOffset, attrType);
-        numPages = 2;
-        headerPageNum = metaPageNo; // should be 1
-        rootPageNum = rootPageNum;  // should be 2
-
-        //create root
-        Page* root;
-        PageId rootPageNo;
-        bufMgr->allocPage(file, rootPageNo, root);
-        NonLeafNodeInt* rootNode = reinterpret_cast<NonLeafNodeInt*>(root);
-        rootNode->level = 1; // How will this be updated once height reaches 3?
-        initalizeNonLeafNode(rootNode);
-        bufMgr->unPinPage(file, rootPageNo, true);
-
-        //TODO Insert record IDs
+        // create BTree
+        FileScan fs = FileScan(relationName, bufMgrIn);
+        while (true) {
+            RecordId rid;
+            try {
+                fs.scanNext(rid);
+                std::string recordStr = fs.getRecord();
+                std::string* recordStrPtr = &recordStr;
+                void* key = recordStrPtr + attrByteOffset;
+                //int keyy = *((int*)key);
+                
+                insertEntry(key, rid);
+            }
+            catch (EndOfFileException e) {
+                break;
+            }
+        }
+    
 
     }
 }
@@ -130,6 +153,10 @@ BTreeIndex::BTreeIndex(const std::string & relationName,
 
 BTreeIndex::~BTreeIndex()
 {
+    // somehow close file scan
+    bufMgr->flushFile(file);
+    // somehow delete file object
+    
 }
 
 // -----------------------------------------------------------------------------
