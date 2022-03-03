@@ -313,7 +313,7 @@ class BTreeIndex {
    * @param attrByteOffset - byte offset of attribute in RID
    * @param attrType - Should always be INTEGER (defined in enum to be 0)
    */
-  void setAttributes(const int attrByteOffset, const Datatype attrType);
+  void setAttributes(const int _attrByteOffset, const Datatype attrType);
 
   /**
    * @brief private helper function to initalize a nonleafNode
@@ -321,6 +321,10 @@ class BTreeIndex {
    * @param nonLeafNode - node to be initalized
    */
   void initalizeNonLeafNode(NonLeafNodeInt* nonLeafNode);
+
+  void handleAlreadyPresent(std::string indexName, BufMgr *bufMgrIn, const int attrByteOffset, const Datatype attrType);
+
+  void handleNew(std::string indexName, BufMgr *bufMgrIn, const int attrByteOffset, const Datatype attrType );
 
 	
  public:
