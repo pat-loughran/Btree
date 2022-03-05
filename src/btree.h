@@ -324,7 +324,15 @@ class BTreeIndex {
 
   void handleAlreadyPresent(std::string indexName, BufMgr *bufMgrIn, const int attrByteOffset, const Datatype attrType);
 
-  void handleNew(std::string indexName, BufMgr *bufMgrIn, const int attrByteOffset, const Datatype attrType );
+  void handleNew(std::string indexName, BufMgr *bufMgrIn, const int attrByteOffset, const Datatype attrType);
+
+  void createFirstChild(int keyInt, RecordId rid, NonLeafNodeInt* root);
+  
+  bool insertInFirstPage(int keyInt, RecordId rid, NonLeafNodeInt* root);
+
+  int findInsertIndex(int KeyInt, LeafNodeInt* curNode);
+
+  void insertHelper(int index, int keyInt, RecordId rid, NonLeafNodeInt* root, LeafNodeInt* firstNode);
 
 	
  public:
