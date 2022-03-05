@@ -277,7 +277,6 @@ void BTreeIndex::insertEntry(const void *key, const RecordId rid)
     int keyInt = *((int*)key);
 
     // get root page
-    // MUST unpin root when done
     Page* rootPage;
     bufMgr->readPage(file, rootPageNum, rootPage);
     NonLeafNodeInt* root = reinterpret_cast<NonLeafNodeInt*>(rootPage);
@@ -304,6 +303,7 @@ void BTreeIndex::insertEntry(const void *key, const RecordId rid)
     // The next Key/Rid pair to be inserted will cause a split that needs to be handled below among any other
     // regular insert logic
     //
+    //remember to unpin the root page and any other pages you visit when you are done with them
 }
 
 // -----------------------------------------------------------------------------
