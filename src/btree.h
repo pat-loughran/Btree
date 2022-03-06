@@ -362,6 +362,8 @@ class BTreeIndex {
 	~BTreeIndex();
 
 
+    void locatePage(PageId currPageNumber);
+
   /**
 	 * Insert a new entry using the pair <value,rid>. 
 	 * Start from root to recursively find out the leaf to insert the entry in. The insertion may cause splitting of leaf node.
