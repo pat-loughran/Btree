@@ -24,7 +24,7 @@ namespace badgerdb
 
 void BTreeIndex::handleAlreadyPresent(std::string indexName, BufMgr *bufMgrIn, const int _attrByteOffset, const Datatype attrType) {
     // set file attribute to actual index
-        file = &BlobFile::open(indexName);
+        file = new BlobFile(indexName,false);
 
         // set bufMgr attribute
         bufMgr = bufMgrIn;
@@ -44,7 +44,7 @@ void BTreeIndex::handleAlreadyPresent(std::string indexName, BufMgr *bufMgrIn, c
 
 void BTreeIndex::handleNew(std::string indexName, BufMgr *bufMgrIn, const int _attrByteOffset, const Datatype attrType) {
         //create actual Btree file in disc
-        file = &BlobFile::create(indexName);
+    file = new BlobFile(indexName,true);
         
         // set bufMgr attribute
         bufMgr = bufMgrIn;
@@ -65,7 +65,7 @@ void BTreeIndex::handleNew(std::string indexName, BufMgr *bufMgrIn, const int _a
         setAttributes(_attrByteOffset, attrType);
         numPages = 2;
         headerPageNum = metaPageNo; // should be 1
-        rootPageNum = rootPageNum;  // should be 2
+        headerPageNum = rootPageNum;  // should be 2
 
         //create root
         Page* root;
@@ -133,6 +133,7 @@ int findInsertIndex(int keyInt, LeafNodeInt* curNode)
             return i+1;
         }
     }
+    return 0;
 }
 
 void BTreeIndex::insertHelper(int index, int keyInt, RecordId rid, NonLeafNodeInt* root, LeafNodeInt* firstNode)
@@ -374,13 +375,10 @@ void BTreeIndex::startScan(const void* lowValParm,
 
     locatePage(rootPageNum);
     bufMgr->readPage(file, currentPageNum, currentPageData);
-     leafNodeInt* node = ( LeafNodeInt*)(currentPageData);
+     LeafNodeInt* node = ( LeafNodeInt*)(currentPageData);
     for (size_t i = 0; i < INTARRAYLEAFSIZE; i++)
     {
-        if(i < leafOccupancy - 1 and node->ridArray[i + 1].page_number == 0)
-        {
-            nullVal = true;
-        }
+
 
         if (((lowOp == GTE && highOp == LTE) && (node->keyArray[i]<= highValInt && node->keyArray[i] >= lowValInt))
         || ((lowOp == GT && highOp == LTE) && (node->keyArray[i]<= highValInt && node->keyArray[i] > lowValInt))
@@ -405,7 +403,6 @@ void BTreeIndex::startScan(const void* lowValParm,
 
 void BTreeIndex::scanNext(RecordId& outRid) 
 {
-
 }
 
 // -----------------------------------------------------------------------------
