@@ -319,7 +319,7 @@ void BTreeIndex::insertEntry(const void *key, const RecordId rid)
 
          NonLeafNodeInt* nleafNode = ( NonLeafNodeInt*)(currPage);
 
-        if(nleafNode->level == 0)
+        if(nleafNode->isLeaf)
         {
             currentPageNum = currPageNumber;
             bufMgr->unPinPage(file, currPageNumber, false);

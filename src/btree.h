@@ -153,7 +153,7 @@ struct NonLeafNodeInt{
    * Level of the node in the tree.
    */
 	int level;
-
+    bool isLeaf;
   /**
    * Stores keys.
    */
@@ -175,6 +175,7 @@ struct LeafNodeInt{
    */
 	int keyArray[ INTARRAYLEAFSIZE ];
 
+    bool isLeaf;
   /**
    * Stores RecordIds.
    */
