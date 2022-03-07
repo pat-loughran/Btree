@@ -399,6 +399,45 @@ void BTreeIndex::startScan(const void* lowValParm,
 
 void BTreeIndex::scanNext(RecordId& outRid) 
 {
+    if (scanExecuting)
+    {
+         LeafNodeInt* node = ( LeafNodeInt*)(currentPageData);
+
+
+        if (node->ridArray[nextEntry].page_number == Page::INVALID_NUMBER)
+        {
+            nextEntry = INTARRAYLEAFSIZE;
+        }
+
+
+        if (nextEntry == INTARRAYLEAFSIZE)
+        {
+            if (node->rightSibPageNo != Page::INVALID_NUMBER)
+            {
+                bufMgr->readPage(file,node->rightSibPageNo, currentPageData);
+                currentPageNum = node->rightSibPageNo;
+                bufMgr->unPinPage(file, currentPageNum, false);
+                nextEntry = 0;
+            }
+            else
+            {
+                throw IndexScanCompletedException();
+            }
+        }
+        if (((highOp == LTE && (node->keyArray[nextEntry] <= highValInt)))
+            || (highOp == LT && (node->keyArray[nextEntry] < highValInt)))
+        {
+            outRid = node->ridArray[nextEntry];
+            nextEntry++;
+        }
+        else
+        {
+            throw IndexScanCompletedException();
+        }
+    }
+    else
+        throw ScanNotInitializedException();
+
 }
 
 // -----------------------------------------------------------------------------
