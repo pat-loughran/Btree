@@ -87,7 +87,7 @@ void BTreeIndex::createFirstChild(int keyInt, RecordId rid, NonLeafNodeInt* root
     LeafNodeInt* firstNode = reinterpret_cast<LeafNodeInt*>(firstPage);
 
     //initalize leaf node values
-    
+    initalizeLeafNode(firstNode);
 
     // set first entry of child page and unpin
     firstNode->keyArray[0] = keyInt;
@@ -191,11 +191,14 @@ void BTreeIndex::initalizeNonLeafNode(NonLeafNodeInt* nonLeafNode) {
             }
             nonLeafNode->pageNoArray[i] = 0; // pre fill values
         }
+        nonLeafNode->isLeaf = false;
 }
 void BTreeIndex::initalizeLeafNode(LeafNodeInt* leafNode) {
     for (int i = 0; i <INTARRAYNONLEAFSIZE; i++) {
         leafNode->keyArray[i] = INT_MAX; // pre fill values
         }
+    leafNode->rightSibPageNo = 0;
+    leafNode->isLeaf = true;
 }
 
 // -----------------------------------------------------------------------------
