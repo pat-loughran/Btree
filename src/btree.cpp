@@ -92,7 +92,6 @@ void BTreeIndex::createFirstChild(int keyInt, RecordId rid, NonLeafNodeInt* root
     // set first entry of child page and unpin
     firstNode->keyArray[0] = keyInt;
     firstNode->ridArray[0] = rid;
-    firstNode->rightSibPageNo = 0; // initalize to invalid page number
     bufMgr->unPinPage(file, firstPageId, true);
 
     // update root and unpin
@@ -111,12 +110,11 @@ void BTreeIndex::createFirstChild(int keyInt, RecordId rid, NonLeafNodeInt* root
 
 int BTreeIndex::findInsertIndex(int keyInt, LeafNodeInt* curNode)
 {
-    for (int i = 0 ; i < INTARRAYLEAFSIZE; i++) {
-        // leaf is full, subsequent code will split and handle
-        if (curNode->keyArray[INTARRAYLEAFSIZE -1] != INT_MAX) {
+    // leaf is full, subsequent code will split and handle
+    if (curNode->keyArray[INTARRAYLEAFSIZE -1] != INT_MAX) {
             return INTARRAYLEAFSIZE;
         }
-
+    for (int i = 0 ; i < INTARRAYLEAFSIZE; i++) {
         int curKey = curNode->keyArray[i];
         int nextKey = curNode->keyArray[i+1];
 
@@ -148,7 +146,7 @@ void BTreeIndex::insertHelper(int index, int keyInt, RecordId rid, NonLeafNodeIn
         rootValue = keyInt;
     }
     else {
-        for (int i = INTARRAYLEAFSIZE-1; i >= 0; i--) {
+        for (int i = INTARRAYLEAFSIZE-1; i >= index; i--) {
             if (firstNode->keyArray[i] != INT_MAX) {
                 firstNode->keyArray[i+1] = firstNode->keyArray[i];
                 firstNode->ridArray[i+1] = firstNode->ridArray[i];
@@ -161,21 +159,22 @@ void BTreeIndex::insertHelper(int index, int keyInt, RecordId rid, NonLeafNodeIn
         firstNode->ridArray[index] = rid;
     }
     //update root key
-    root->keyArray[0] = rootValue;
+    root->keyArray[0] = rootValue+1;
     
     //unpin root and firstPage
     bufMgr->unPinPage(file, (PageId)2, true);
-    bufMgr->unPinPage(file, (PageId)3, true);
+    bufMgr->unPinPage(file, root->pageNoArray[0], true);
 
 }
 
 bool BTreeIndex::insertInFirstPage(int keyInt, RecordId rid, NonLeafNodeInt* root)
 {
     Page* firstPage;
-    bufMgr->readPage(file, (PageId)3, firstPage);
+    bufMgr->readPage(file, root->pageNoArray[0], firstPage);
     LeafNodeInt* firstNode = reinterpret_cast<LeafNodeInt*>(firstPage);
     int insertIndex = findInsertIndex(keyInt, firstNode);
     if (insertIndex == INTARRAYLEAFSIZE) {
+        bufMgr->unPinPage(file, root->pageNoArray[0], false);
         return false;
     }
     insertHelper(insertIndex, keyInt, rid, root, firstNode);
