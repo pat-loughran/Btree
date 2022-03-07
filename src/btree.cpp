@@ -23,30 +23,27 @@
 namespace badgerdb
 {
 
-void BTreeIndex::handleAlreadyPresent(std::string indexName, BufMgr *bufMgrIn, const int _attrByteOffset, const Datatype attrType) {
-    // set file attribute to actual index
-        file = new BlobFile(indexName,false);
-
+void BTreeIndex::handleAlreadyPresent(std::string indexName, BufMgr *bufMgrIn, std::string relationName, const int _attrByteOffset, const Datatype attrType) {
         // set bufMgr attribute
         bufMgr = bufMgrIn;
 
-        // read meta page from index to fill rootPageNum
+        // read meta page from index
         Page* metaPage;
         bufMgr->readPage(file, (PageId)1, metaPage); //read page
         IndexMetaInfo* metaInfo = reinterpret_cast<IndexMetaInfo*>(metaPage);
+
+        // check if arguments are correct
+        if (relationName != metaInfo->relationName || _attrByteOffset != metaInfo->attrByteOffset || attrType != metaInfo->attrType) {
+            throw BadIndexInfoException("error");
+        }
+	// set attributes and unpin
         rootPageNum = metaInfo->rootPageNo;
-        headerPageNum = (PageId)1; // possibly unnecsarry
         numPages = metaInfo->numPages;
         bufMgr->unPinPage(file, (PageId)1, false); //unpin page
-
-        // set btree instance fields
-        setAttributes(_attrByteOffset, attrType);
 }
 
-void BTreeIndex::handleNew(std::string indexName, BufMgr *bufMgrIn, const int _attrByteOffset, const Datatype attrType) {
-        //create actual Btree file in disc
-    file = new BlobFile(indexName,true);
-        
+void BTreeIndex::handleNew(std::string indexName, BufMgr *bufMgrIn, std::string relationName, const int _attrByteOffset, const Datatype attrType) {
+
         // set bufMgr attribute
         bufMgr = bufMgrIn;
 
@@ -55,7 +52,9 @@ void BTreeIndex::handleNew(std::string indexName, BufMgr *bufMgrIn, const int _a
         PageId metaPageNo; // should be 1
         bufMgr->allocPage(file, metaPageNo, metaPage);
         IndexMetaInfo* metaInfo = reinterpret_cast<IndexMetaInfo*>(metaPage);
-        //metaInfo->relationName = relationName.c_str(); Why does this give me an error
+
+        //set header page attributes
+        strcpy(metaInfo->relationName, relationName.c_str());
         metaInfo->attrByteOffset = _attrByteOffset;
         metaInfo->attrType = attrType;
         metaInfo->rootPageNo = (PageId)2; //might need to dynamically set this after root created
@@ -63,10 +62,11 @@ void BTreeIndex::handleNew(std::string indexName, BufMgr *bufMgrIn, const int _a
         bufMgr->unPinPage(file, metaPageNo, true);
 
         // set Btree instance fields
-        setAttributes(_attrByteOffset, attrType);
-        numPages = 2;
         headerPageNum = metaPageNo; // should be 1
-        headerPageNum = rootPageNum;  // should be 2
+        rootPageNum = (PageId)2;
+        attributeType = attrType;
+        attrByteOffset = _attrByteOffset;
+        numPages = 2;
 
         //create root
         Page* root;
@@ -109,7 +109,7 @@ void BTreeIndex::createFirstChild(int keyInt, RecordId rid, NonLeafNodeInt* root
     bufMgr->unPinPage(file, (PageId)1, true);
 }
 
-int findInsertIndex(int keyInt, LeafNodeInt* curNode)
+int BTreeIndex::findInsertIndex(int keyInt, LeafNodeInt* curNode)
 {
     for (int i = 0 ; i < INTARRAYLEAFSIZE; i++) {
         // leaf is full, subsequent code will split and handle
@@ -134,7 +134,7 @@ int findInsertIndex(int keyInt, LeafNodeInt* curNode)
             return i+1;
         }
     }
-    return 0;
+    return -1; //Error if code reached
 }
 
 void BTreeIndex::insertHelper(int index, int keyInt, RecordId rid, NonLeafNodeInt* root, LeafNodeInt* firstNode)
@@ -183,19 +183,8 @@ bool BTreeIndex::insertInFirstPage(int keyInt, RecordId rid, NonLeafNodeInt* roo
 
 }
 
-// -----------------------------------------------------------------------------
-// BTreeIndex::setAttributes -- private helper
-// -----------------------------------------------------------------------------
-void BTreeIndex::setAttributes(const int _attrByteOffset, const Datatype attrType)
-{
-    headerPageNum = (PageId)1; // need to ask if this is always true
-    attributeType = attrType;
-    attrByteOffset = _attrByteOffset;
-    leafOccupancy = INTARRAYLEAFSIZE; // need to see if should be capacity or actual
-    nodeOccupancy = INTARRAYNONLEAFSIZE; // need to see if should be capacity or actual 
-}
 
-void initalizeNonLeafNode(NonLeafNodeInt* nonLeafNode) {
+void BTreeIndex::initalizeNonLeafNode(NonLeafNodeInt* nonLeafNode) {
     for (int i = 0; i <INTARRAYNONLEAFSIZE + 1; i++) {
             if (i < INTARRAYNONLEAFSIZE) {
                 nonLeafNode->keyArray[i] = INT_MAX; // pre fill values
@@ -203,7 +192,7 @@ void initalizeNonLeafNode(NonLeafNodeInt* nonLeafNode) {
             nonLeafNode->pageNoArray[i] = 0; // pre fill values
         }
 }
-void initalizeLeafNode(LeafNodeInt* leafNode) {
+void BTreeIndex::initalizeLeafNode(LeafNodeInt* leafNode) {
     for (int i = 0; i <INTARRAYNONLEAFSIZE; i++) {
         leafNode->keyArray[i] = INT_MAX; // pre fill values
         }
@@ -226,34 +215,40 @@ BTreeIndex::BTreeIndex(const std::string & relationName,
     
     // return indexName
     outIndexName = indexName;
-    
-    // check if the index file already exists
-    if (BlobFile::exists(indexName)) {
-        handleAlreadyPresent(indexName, bufMgrIn, attrByteOffset, attrType);
+
+    try {
+        BlobFile indexFile = BlobFile::open(indexName);
+        file = &indexFile;
+        handleAlreadyPresent(indexName, bufMgrIn, relationName, attrByteOffset, attrType);
         return;
     }
-    else {
-        handleNew(indexName, bufMgrIn, attrByteOffset, attrType);
+    catch (FileNotFoundException &e) {
+        //file did not exist, must create new one below
+    }
 
-        // create BTree
-        FileScan fs = FileScan(relationName, bufMgrIn);
-        while (true) {
-            RecordId rid;
-            try {
-                fs.scanNext(rid);
-                std::string recordStr = fs.getRecord();
-                std::string* recordStrPtr = &recordStr;
-                void* key = recordStrPtr + attrByteOffset;
-                //int keyy = *((int*)key);
-                
-                insertEntry(key, rid);
+    //create actual Btree file in disc
+    BlobFile indexFile = BlobFile::create(indexName);
+    file = &indexFile;
+
+    //set up new file
+    handleNew(indexName, bufMgrIn, relationName, attrByteOffset, attrType);
+
+    // create BTree
+    FileScan fs = FileScan(relationName, bufMgrIn);
+    while (true) {
+        RecordId rid;
+        try {
+            fs.scanNext(rid);
+            std::string recordStr = fs.getRecord();
+            const char* recordCStrC = recordStr.c_str();
+            char* recordCStr;
+            strcpy(recordCStr, recordCStrC);
+            void* key = recordCStr + attrByteOffset;  
+            insertEntry(key, rid);
             }
-            catch (EndOfFileException e) {
-                break;
-            }
+        catch (EndOfFileException &e) {
+            break;
         }
-    
-
     }
 }
 
