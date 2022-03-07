@@ -308,24 +308,15 @@ class BTreeIndex {
    */
 	Operator	highOp;
 
-  /**
-   * @brief private helper function to set the attributes of the BTree object
-   * 
-   * @param attrByteOffset - byte offset of attribute in RID
-   * @param attrType - Should always be INTEGER (defined in enum to be 0)
-   */
-  void setAttributes(const int _attrByteOffset, const Datatype attrType);
-
-  /**
-   * @brief private helper function to initalize a nonleafNode
-   * 
-   * @param nonLeafNode - node to be initalized
-   */
+  
+  
   void initalizeNonLeafNode(NonLeafNodeInt* nonLeafNode);
 
-  void handleAlreadyPresent(std::string indexName, BufMgr *bufMgrIn, const int attrByteOffset, const Datatype attrType);
+  void initalizeLeafNode(LeafNodeInt* leafNode);
 
-  void handleNew(std::string indexName, BufMgr *bufMgrIn, const int attrByteOffset, const Datatype attrType);
+  void handleAlreadyPresent(std::string indexName, BufMgr *bufMgrIn, std::string relationName, const int attrByteOffset, const Datatype attrType);
+
+  void handleNew(std::string indexName, BufMgr *bufMgrIn, std::string relationName, const int attrByteOffset, const Datatype attrType);
 
   void createFirstChild(int keyInt, RecordId rid, NonLeafNodeInt* root);
   
@@ -334,7 +325,6 @@ class BTreeIndex {
   int findInsertIndex(int KeyInt, LeafNodeInt* curNode);
 
   void insertHelper(int index, int keyInt, RecordId rid, NonLeafNodeInt* root, LeafNodeInt* firstNode);
-
 	
  public:
 
