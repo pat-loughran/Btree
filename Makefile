@@ -16,7 +16,6 @@ endif
 export PATH
 
 all: $(LIB)/bufmgr.a $(OBJ)/filescan.o $(OBJ)/main.o $(OBJ)/btree.o
-	rm -r src/relA*
 	cd src;\
 	rm -rf ../relA*;\
 	$(CC) $(CFLAGS) -I. obj/filescan.o obj/main.o obj/btree.o lib/bufmgr.a lib/exceptions.a -o badgerdb_main
