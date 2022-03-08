@@ -135,6 +135,49 @@ int BTreeIndex::findInsertIndex(int keyInt, LeafNodeInt* curNode)
     return -1; //Error if code reached
 }
 
+int findInsertIndexArr(int keyInt, int* arr)
+{
+    if (keyInt > arr[INTARRAYLEAFSIZE]) {
+        return INTARRAYLEAFSIZE;
+    }
+
+    if (keyInt < arr[0]) {
+        return 0;
+    }
+    for (int i = 0; i < INTARRAYLEAFSIZE; i++) {
+        int cur = arr[i];
+        int next = arr[i+1];
+
+        if (keyInt > cur && keyInt < next) {
+            return i+1;
+        }
+    }
+}
+
+int BTreeIndex::findInsertIndexSplit(int keyInt, LeafNodeInt* curNode)
+{
+    for (int i = 0 ; i < INTARRAYLEAFSIZE; i++) {
+        int curKey = curNode->keyArray[i];
+        int nextKey = curNode->keyArray[i+1];
+
+        //key goes in last element
+        if (keyInt > curNode->keyArray[INTARRAYLEAFSIZE - 1] ){
+            return INTARRAYLEAFSIZE - 1;
+        }
+
+        // key goes in first element
+        if (i == 0 && keyInt < curKey) {
+            return 0;
+        }
+
+        // key goes inbetween current and next
+        if (keyInt > curKey && keyInt < nextKey) {
+            return i+1;
+        }
+    }
+    return -1; //Error if code reached
+}
+
 void BTreeIndex::insertHelper(bool regular, int index, int keyInt, RecordId rid, NonLeafNodeInt* root, LeafNodeInt* firstNode)
 {
     int rootValue = INT_MAX;
@@ -169,6 +212,30 @@ void BTreeIndex::insertHelper(bool regular, int index, int keyInt, RecordId rid,
     bufMgr->unPinPage(file, root->pageNoArray[0], true);
     }
 
+}
+
+ void BTreeIndex::insertHelperArr(int index, int keyInt, int* arr, RecordId* arrR, RecordId rid)
+ {
+    for (int i = INTARRAYLEAFSIZE; i >= index; i++) {
+        if (arr[i] != INT_MAX) {
+            arr[i+1] = arr[i];
+            arrR[i+1] = arrR[i];
+        }
+    }
+    arr[index] =  keyInt;
+    arrR[index] = rid;
+ }
+
+void BTreeIndex::NonLeafNodeInsertHelper(int index, int keyInt, PageId pageNo, NonLeafNodeInt* leafHolder)
+{
+    for (int i = INTARRAYNONLEAFSIZE-1; i >= index; i--) {
+        if (leafHolder->keyArray[i] != INT_MAX) {
+            leafHolder->keyArray[i+1] = leafHolder->keyArray[i];
+            leafHolder->pageNoArray[i+2] = leafHolder->pageNoArray[i+1];
+        }
+    }
+        leafHolder->keyArray[index] = keyInt;
+        leafHolder->pageNoArray[index+1] = pageNo;
 }
 
 bool BTreeIndex::insertInFirstPage(int keyInt, RecordId rid, NonLeafNodeInt* root)
@@ -401,7 +468,67 @@ void BTreeIndex::insertEntry(const void *key, const RecordId rid)
         return;
     }
 
-    //leaf is full, must split :/
+    // leaf is full, must split
+
+    // Whoops, looks like a nonleafnode split coming up, I can't handle this
+    if (leafHolder->keyArray[INTARRAYNONLEAFSIZE-1] != INT_MAX) {
+        std::cout << "Nonleaf node split X(\n";
+        exit(1);
+    }
+
+    //get old leaf
+    Page* oldLeafPage;
+    bufMgr->readPage(file, leafHolder->pageNoArray[index], oldLeafPage);
+    LeafNodeInt* oldLeaf = reinterpret_cast<LeafNodeInt*>(oldLeafPage);
+    PageId oldLeafSib = oldLeaf->rightSibPageNo;
+
+    // create new leaf
+    Page* newLeafPage;
+    PageId newLeafPageId;
+    bufMgr->allocPage(file, newLeafPageId, newLeafPage);
+    LeafNodeInt* newLeaf = reinterpret_cast<LeafNodeInt*>(newLeafPage);
+    initalizeLeafNode(newLeaf);
+
+    int temp[INTARRAYLEAFSIZE+1];
+    RecordId tempR[INTARRAYLEAFSIZE+1];
+    for (int i = 0; i < INTARRAYLEAFSIZE; i++) {
+        temp[i] = oldLeaf->keyArray[i];
+        tempR[i] = oldLeaf->ridArray[i];
+    } 
+    temp[INTARRAYLEAFSIZE] = INT_MAX;
+
+    int indexIntoOldLeaf = findInsertIndexArr(keyInt, temp);
+    insertHelperArr(indexIntoOldLeaf, keyInt, temp, tempR, rid);
+
+    bool arrIsEven = INTARRAYLEAFSIZE % 2 == 0 ? true : false;
+
+        int counter = 0;
+        //set new leaf 
+        for (int i = INTARRAYLEAFSIZE/2; i < INTARRAYLEAFSIZE+1; i++) {
+            newLeaf->keyArray[counter] = temp[i];
+            newLeaf->ridArray[counter] = tempR[i];
+            counter++;
+        }
+        //subtract from old leaf
+        for (int i = 0; i < INTARRAYLEAFSIZE; i++) {
+            if (i < INTARRAYLEAFSIZE/2) {
+                oldLeaf->keyArray[i] = temp[i];
+                oldLeaf->ridArray[i] = tempR[i];
+            }
+            else {
+                oldLeaf->keyArray[i] = INT_MAX;
+            }
+        }
+    
+    //perform split
+    newLeaf->rightSibPageNo = leafHolder->pageNoArray[index];
+    oldLeaf->rightSibPageNo = newLeafPageId;
+    NonLeafNodeInsertHelper(index, newLeaf->keyArray[0], newLeafPageId, leafHolder);
+
+
+        
+
+
 
 }
 // -----------------------------------------------------------------------------
