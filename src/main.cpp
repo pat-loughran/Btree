@@ -47,9 +47,9 @@ std::string intIndexName, doubleIndexName, stringIndexName;
 // This is the structure for tuples in the base relation
 
 typedef struct tuple {
-	int i;
-	double d;
-	char s[64];
+    int i;
+    double d;
+    char s[64];
 } RECORD;
 
 PageFile* file1;
@@ -64,130 +64,117 @@ BufMgr * bufMgr = new BufMgr(100);
 // -----------------------------------------------------------------------------
 
 void createRelationForward();
-void createRelationForwardInRange(int begin, int end);
 void createRelationBackward();
 void createRelationRandom();
 void intTests();
-void intTestsNegative();
 int intScan(BTreeIndex *index, int lowVal, Operator lowOp, int highVal, Operator highOp);
 void indexTests();
-void indexTestsNegative();
 void test1();
 void test2();
 void test3();
-void testNegative();
 void errorTests();
 void deleteRelation();
 
 int main(int argc, char **argv)
 {
 
-  // Clean up from any previous runs that crashed.
-  try
-	{
+    // Clean up from any previous runs that crashed.
+    try
+    {
+        File::remove(relationName);
+    }
+    catch(const FileNotFoundException &)
+    {
+    }
+
+    {
+        // Create a new database file.
+        PageFile new_file = PageFile::create(relationName);
+
+        // Allocate some pages and put data on them.
+        for (int i = 0; i < 20; ++i)
+        {
+            PageId new_page_number;
+            Page new_page = new_file.allocatePage(new_page_number);
+
+            sprintf(record1.s, "%05d string record", i);
+            record1.i = i;
+            record1.d = (double)i;
+            std::string new_data(reinterpret_cast<char*>(&record1), sizeof(record1));
+
+            new_page.insertRecord(new_data);
+            new_file.writePage(new_page_number, new_page);
+        }
+
+    }
+    // new_file goes out of scope here, so file is automatically closed.
+
+    {
+        FileScan fscan(relationName, bufMgr);
+
+        try
+        {
+            RecordId scanRid;
+            while(1)
+            {
+                fscan.scanNext(scanRid);
+                //Assuming RECORD.i is our key, lets extract the key, which we know is INTEGER and whose byte offset is also know inside the record.
+                std::string recordStr = fscan.getRecord();
+                const char *record = recordStr.c_str();
+                int key = *((int *)(record + offsetof (RECORD, i)));
+                std::cout << "Extracted : " << key << std::endl;
+            }
+        }
+        catch(const EndOfFileException &e)
+        {
+            std::cout << "Read all records" << std::endl;
+        }
+    }
+    // filescan goes out of scope here, so relation file gets closed.
+
     File::remove(relationName);
-  }
-	catch(const FileNotFoundException &)
-	{
-  }
 
-	{
-		// Create a new database file.
-		PageFile new_file = PageFile::create(relationName);
+    test1();
+    test2();
+    test3();
+    errorTests();
 
-		// Allocate some pages and put data on them.
-		for (int i = 0; i < 20; ++i)
-		{
-			PageId new_page_number;
-			Page new_page = new_file.allocatePage(new_page_number);
+    delete bufMgr;
 
-    	sprintf(record1.s, "%05d string record", i);
-    	record1.i = i;
-    	record1.d = (double)i;
-    	std::string new_data(reinterpret_cast<char*>(&record1), sizeof(record1));
-
-			new_page.insertRecord(new_data);
-			new_file.writePage(new_page_number, new_page);
-		}
-
-	}
-	// new_file goes out of scope here, so file is automatically closed.
-
-	{
-		FileScan fscan(relationName, bufMgr);
-
-		try
-		{
-			RecordId scanRid;
-			while(1)
-			{
-				fscan.scanNext(scanRid);
-				//Assuming RECORD.i is our key, lets extract the key, which we know is INTEGER and whose byte offset is also know inside the record. 
-				std::string recordStr = fscan.getRecord();
-				const char *record = recordStr.c_str();
-				int key = *((int *)(record + offsetof (RECORD, i)));
-				std::cout << "Extracted : " << key << std::endl;
-			}
-		}
-		catch(const EndOfFileException &e)
-		{
-			std::cout << "Read all records" << std::endl;
-		}
-	}
-	// filescan goes out of scope here, so relation file gets closed.
-
-	File::remove(relationName);
-	testNegative();
-	test1();
-	test2();
-	test3();
-	errorTests();
-
-	delete bufMgr;
-
-  return 1;
+    return 1;
 }
 
 void test1()
 {
-	// Create a relation with tuples valued 0 to relationSize and perform index tests 
-	// on attributes of all three types (int, double, string)
-	std::cout << "---------------------" << std::endl;
-	std::cout << "createRelationForward" << std::endl;
-	createRelationForward();
-	indexTests();
-	deleteRelation();
+    // Create a relation with tuples valued 0 to relationSize and perform index tests
+    // on attributes of all three types (int, double, string)
+    std::cout << "---------------------" << std::endl;
+    std::cout << "createRelationForward" << std::endl;
+    createRelationForward();
+    indexTests();
+    deleteRelation();
 }
 
 void test2()
 {
-	// Create a relation with tuples valued 0 to relationSize in reverse order and perform index tests 
-	// on attributes of all three types (int, double, string)
-	std::cout << "----------------------" << std::endl;
-	std::cout << "createRelationBackward" << std::endl;
-	createRelationBackward();
-	indexTests();
-	deleteRelation();
+    // Create a relation with tuples valued 0 to relationSize in reverse order and perform index tests
+    // on attributes of all three types (int, double, string)
+    std::cout << "----------------------" << std::endl;
+    std::cout << "createRelationBackward" << std::endl;
+    createRelationBackward();
+    indexTests();
+    deleteRelation();
 }
 
 void test3()
 {
-	// Create a relation with tuples valued 0 to relationSize in random order and perform index tests 
-	// on attributes of all three types (int, double, string)
-	std::cout << "--------------------" << std::endl;
-	std::cout << "createRelationRandom" << std::endl;
-	createRelationRandom();
-	indexTests();
-	deleteRelation();
-}
-
-void testNegative()
-{
-    std::cout << "---------------------" << std::endl;
-	std::cout << "CreateRelationForward with -2000, 2000" << std::endl;
-	createRelationForwardInRange(-2000, 2000);
-	indexTestsNegative();
-	deleteRelation(); 
+    // Create a relation with tuples valued 0 to relationSize in random order and perform index tests
+    // on attributes of all three types (int, double, string)
+    std::cout << "--------------------" << std::endl;
+    std::cout << "createRelationRandom" << std::endl;
+    createRelationRandom();
+    indexTests();
+    deleteRelation();
 }
 
 // -----------------------------------------------------------------------------
@@ -196,92 +183,47 @@ void testNegative()
 
 void createRelationForward()
 {
-	std::vector<RecordId> ridVec;
-  // destroy any old copies of relation file
-	try
-	{
-		File::remove(relationName);
-	}
-	catch(const FileNotFoundException &e)
-	{
-	}
+    std::vector<RecordId> ridVec;
+    // destroy any old copies of relation file
+    try
+    {
+        File::remove(relationName);
+    }
+    catch(const FileNotFoundException &e)
+    {
+    }
 
-  file1 = new PageFile(relationName, true);
+    file1 = new PageFile(relationName, true);
 
-  // initialize all of record1.s to keep purify happy
-  memset(record1.s, ' ', sizeof(record1.s));
-	PageId new_page_number;
-  Page new_page = file1->allocatePage(new_page_number);
+    // initialize all of record1.s to keep purify happy
+    memset(record1.s, ' ', sizeof(record1.s));
+    PageId new_page_number;
+    Page new_page = file1->allocatePage(new_page_number);
 
-  // Insert a bunch of tuples into the relation.
-  for(int i = 0; i < relationSize; i++ )
-	{
-    sprintf(record1.s, "%05d string record", i);
-    record1.i = i;
-    record1.d = (double)i;
-    std::string new_data(reinterpret_cast<char*>(&record1), sizeof(record1));
+    // Insert a bunch of tuples into the relation.
+    for(int i = 0; i < relationSize; i++ )
+    {
+        sprintf(record1.s, "%05d string record", i);
+        record1.i = i;
+        record1.d = (double)i;
+        std::string new_data(reinterpret_cast<char*>(&record1), sizeof(record1));
 
-		while(1)
-		{
-			try
-			{
-    		new_page.insertRecord(new_data);
-				break;
-			}
-			catch(const InsufficientSpaceException &e)
-			{
-				file1->writePage(new_page_number, new_page);
-  			new_page = file1->allocatePage(new_page_number);
-			}
-		}
-  }
+        while(1)
+        {
+            try
+            {
+                new_page.insertRecord(new_data);
+                break;
+            }
+            catch(const InsufficientSpaceException &e)
+            {
+                file1->writePage(new_page_number, new_page);
+                new_page = file1->allocatePage(new_page_number);
+            }
+        }
+    }
 
-	file1->writePage(new_page_number, new_page);
-}
-
-void createRelationForwardInRange(int beg, int end)
-{
-	std::vector<RecordId> ridVec;
-  // destroy any old copies of relation file
-	try
-	{
-		File::remove(relationName);
-	}
-	catch(const FileNotFoundException &e)
-	{
-	}
-
-  file1 = new PageFile(relationName, true);
-
-  // initialize all of record1.s to keep purify happy
-  memset(record1.s, ' ', sizeof(record1.s));
-	PageId new_page_number;
-  Page new_page = file1->allocatePage(new_page_number);
-
-  // Insert a bunch of tuples into the relation.
-  for(int i = beg; i < end; i++ )
-	{
-    sprintf(record1.s, "%05d string record", i);
-    record1.i = i;
-    record1.d = (double)i;
-    std::string new_data(reinterpret_cast<char*>(&record1), sizeof(record1));
-
-		while(1)
-		{
-			try
-			{
-    		new_page.insertRecord(new_data);
-				break;
-			}
-			catch(const InsufficientSpaceException &e)
-			{
-				file1->writePage(new_page_number, new_page);
-  			new_page = file1->allocatePage(new_page_number);
-			}
-		}
-  }
-
-	file1->writePage(new_page_number, new_page);
+    file1->writePage(new_page_number, new_page);
 }
 
 // -----------------------------------------------------------------------------
@@ -290,46 +232,46 @@ void createRelationForwardInRange(int beg, int end)
 
 void createRelationBackward()
 {
-  // destroy any old copies of relation file
-	try
-	{
-		File::remove(relationName);
-	}
-	catch(const FileNotFoundException &e)
-	{
-	}
-  file1 = new PageFile(relationName, true);
+    // destroy any old copies of relation file
+    try
+    {
+        File::remove(relationName);
+    }
+    catch(const FileNotFoundException &e)
+    {
+    }
+    file1 = new PageFile(relationName, true);
 
-  // initialize all of record1.s to keep purify happy
-  memset(record1.s, ' ', sizeof(record1.s));
-	PageId new_page_number;
-  Page new_page = file1->allocatePage(new_page_number);
+    // initialize all of record1.s to keep purify happy
+    memset(record1.s, ' ', sizeof(record1.s));
+    PageId new_page_number;
+    Page new_page = file1->allocatePage(new_page_number);
 
-  // Insert a bunch of tuples into the relation.
-  for(int i = relationSize - 1; i >= 0; i-- )
-	{
-    sprintf(record1.s, "%05d string record", i);
-    record1.i = i;
-    record1.d = i;
+    // Insert a bunch of tuples into the relation.
+    for(int i = relationSize - 1; i >= 0; i-- )
+    {
+        sprintf(record1.s, "%05d string record", i);
+        record1.i = i;
+        record1.d = i;
 
-    std::string new_data(reinterpret_cast<char*>(&record1), sizeof(RECORD));
+        std::string new_data(reinterpret_cast<char*>(&record1), sizeof(RECORD));
 
-		while(1)
-		{
-			try
-			{
-    		new_page.insertRecord(new_data);
-				break;
-			}
-			catch(const InsufficientSpaceException &e)
-			{
-				file1->writePage(new_page_number, new_page);
-  			new_page = file1->allocatePage(new_page_number);
-			}
-		}
-  }
+        while(1)
+        {
+            try
+            {
+                new_page.insertRecord(new_data);
+                break;
+            }
+            catch(const InsufficientSpaceException &e)
+            {
+                file1->writePage(new_page_number, new_page);
+                new_page = file1->allocatePage(new_page_number);
+            }
+        }
+    }
 
-	file1->writePage(new_page_number, new_page);
+    file1->writePage(new_page_number, new_page);
 }
 
 // -----------------------------------------------------------------------------
@@ -338,63 +280,63 @@ void createRelationBackward()
 
 void createRelationRandom()
 {
-  // destroy any old copies of relation file
-	try
-	{
-		File::remove(relationName);
-	}
-	catch(const FileNotFoundException &e)
-	{
-	}
-  file1 = new PageFile(relationName, true);
+    // destroy any old copies of relation file
+    try
+    {
+        File::remove(relationName);
+    }
+    catch(const FileNotFoundException &e)
+    {
+    }
+    file1 = new PageFile(relationName, true);
 
-  // initialize all of record1.s to keep purify happy
-  memset(record1.s, ' ', sizeof(record1.s));
-	PageId new_page_number;
-  Page new_page = file1->allocatePage(new_page_number);
+    // initialize all of record1.s to keep purify happy
+    memset(record1.s, ' ', sizeof(record1.s));
+    PageId new_page_number;
+    Page new_page = file1->allocatePage(new_page_number);
 
-  // insert records in random order
+    // insert records in random order
 
-  std::vector<int> intvec(relationSize);
-  for( int i = 0; i < relationSize; i++ )
-  {
-    intvec[i] = i;
-  }
+    std::vector<int> intvec(relationSize);
+    for( int i = 0; i < relationSize; i++ )
+    {
+        intvec[i] = i;
+    }
 
-  long pos;
-  int val;
-	int i = 0;
-  while( i < relationSize )
-  {
-    pos = random() % (relationSize-i);
-    val = intvec[pos];
-    sprintf(record1.s, "%05d string record", val);
-    record1.i = val;
-    record1.d = val;
+    long pos;
+    int val;
+    int i = 0;
+    while( i < relationSize )
+    {
+        pos = random() % (relationSize-i);
+        val = intvec[pos];
+        sprintf(record1.s, "%05d string record", val);
+        record1.i = val;
+        record1.d = val;
 
-    std::string new_data(reinterpret_cast<char*>(&record1), sizeof(RECORD));
+        std::string new_data(reinterpret_cast<char*>(&record1), sizeof(RECORD));
 
-		while(1)
-		{
-			try
-			{
-    		new_page.insertRecord(new_data);
-				break;
-			}
-			catch(const InsufficientSpaceException &e)
-			{
-      	file1->writePage(new_page_number, new_page);
-  			new_page = file1->allocatePage(new_page_number);
-			}
-		}
+        while(1)
+        {
+            try
+            {
+                new_page.insertRecord(new_data);
+                break;
+            }
+            catch(const InsufficientSpaceException &e)
+            {
+                file1->writePage(new_page_number, new_page);
+                new_page = file1->allocatePage(new_page_number);
+            }
+        }
 
-		int temp = intvec[relationSize-1-i];
-		intvec[relationSize-1-i] = intvec[pos];
-		intvec[pos] = temp;
-		i++;
-  }
-  
-	file1->writePage(new_page_number, new_page);
+        int temp = intvec[relationSize-1-i];
+        intvec[relationSize-1-i] = intvec[pos];
+        intvec[pos] = temp;
+        i++;
+    }
+
+    file1->writePage(new_page_number, new_page);
 }
 
 // -----------------------------------------------------------------------------
@@ -403,39 +345,15 @@ void createRelationRandom()
 
 void indexTests()
 {
-  intTests();
-	try
-	{
-		File::remove(intIndexName);
-	}
-  catch(const FileNotFoundException &e)
-  {
-  }
+    intTests();
+    try
+    {
+        File::remove(intIndexName);
+    }
+    catch(const FileNotFoundException &e)
+    {
+    }
 }
-
-void indexTestsNegative()
-{
-   std::cout << "Create a B+ Tree index on the integer field" << std::endl;
-  BTreeIndex index(relationName, intIndexName, bufMgr, offsetof(tuple,i), INTEGER);
-
-	// run some tests
-	checkPassFail(intScan(&index,25,GT,40,LT), 14)
-	checkPassFail(intScan(&index,20,GTE,35,LTE), 16)
-	checkPassFail(intScan(&index,-3,GT,3,LT), 5)
-	// checkPassFail(intScan(&index,-40,GT,50,LT), 89)
-	// checkPassFail(intScan(&index,0,GT,1,LT), 0)
-	// checkPassFail(intScan(&index,300,GT,400,LT), 99)
-	// checkPassFail(intScan(&index,3000,GTE,4000,LT), 0)
-	try
-	{
-		File::remove(intIndexName);
-	}
-  catch(const FileNotFoundException &e)
-  {
-  }
-}
-
-
 
 // -----------------------------------------------------------------------------
 // intTests
@@ -443,79 +361,77 @@ void indexTestsNegative()
 
 void intTests()
 {
-  std::cout << "Create a B+ Tree index on the integer field" << std::endl;
-  BTreeIndex index(relationName, intIndexName, bufMgr, offsetof(tuple,i), INTEGER);
+    std::cout << "Create a B+ Tree index on the integer field" << std::endl;
+    BTreeIndex index(relationName, intIndexName, bufMgr, offsetof(tuple,i), INTEGER);
 
-	// run some tests
-	checkPassFail(intScan(&index,25,GT,40,LT), 14)
-	checkPassFail(intScan(&index,20,GTE,35,LTE), 16)
-	checkPassFail(intScan(&index,-3,GT,3,LT), 3)
-	checkPassFail(intScan(&index,996,GT,1001,LT), 4)
-	checkPassFail(intScan(&index,0,GT,1,LT), 0)
-	checkPassFail(intScan(&index,300,GT,400,LT), 99)
-	checkPassFail(intScan(&index,3000,GTE,4000,LT), 1000)
+    // run some tests
+    checkPassFail(intScan(&index,25,GT,40,LT), 14)
+    checkPassFail(intScan(&index,20,GTE,35,LTE), 16)
+    checkPassFail(intScan(&index,-3,GT,3,LT), 3)
+    checkPassFail(intScan(&index,996,GT,1001,LT), 4)
+    checkPassFail(intScan(&index,0,GT,1,LT), 0)
+    checkPassFail(intScan(&index,300,GT,400,LT), 99)
+    checkPassFail(intScan(&index,3000,GTE,4000,LT), 1000)
 }
-
 
 int intScan(BTreeIndex * index, int lowVal, Operator lowOp, int highVal, Operator highOp)
 {
-  RecordId scanRid;
-	Page *curPage;
+    RecordId scanRid;
+    Page *curPage;
 
-  std::cout << "Scan for ";
-  if( lowOp == GT ) { std::cout << "("; } else { std::cout << "["; }
-  std::cout << lowVal << "," << highVal;
-  if( highOp == LT ) { std::cout << ")"; } else { std::cout << "]"; }
-  std::cout << std::endl;
+    std::cout << "Scan for ";
+    if( lowOp == GT ) { std::cout << "("; } else { std::cout << "["; }
+    std::cout << lowVal << "," << highVal;
+    if( highOp == LT ) { std::cout << ")"; } else { std::cout << "]"; }
+    std::cout << std::endl;
 
-  int numResults = 0;
-	
-	try
-	{
-  	index->startScan(&lowVal, lowOp, &highVal, highOp);
-	  
-	}
-	catch(const NoSuchKeyFoundException &e)
-	{
-    std::cout << "No Key Found satisfying the scan criteria." << std::endl;
-		return 0;
-	}
+    int numResults = 0;
 
-	while(1)
-	{
-		try
-		{
-			index->scanNext(scanRid);
-			bufMgr->readPage(file1, scanRid.page_number, curPage);
-			RECORD myRec = *(reinterpret_cast<const RECORD*>(curPage->getRecord(scanRid).data()));
-			bufMgr->unPinPage(file1, scanRid.page_number, false);
+    try
+    {
+        index->startScan(&lowVal, lowOp, &highVal, highOp);
+    }
+    catch(const NoSuchKeyFoundException &e)
+    {
+        std::cout << "No Key Found satisfying the scan criteria." << std::endl;
+        return 0;
+    }
 
-			if( numResults < 5 )
-			{
-				std::cout << "at:" << scanRid.page_number << "," << scanRid.slot_number;
-				std::cout << " -->:" << myRec.i << ":" << myRec.d << ":" << myRec.s << ":" <<std::endl;
-			}
-			else if( numResults == 5 )
-			{
-				std::cout << "..." << std::endl;
-			}
-		}
-		catch(const IndexScanCompletedException &e)
-		{
-			break;
-		}
+    while(1)
+    {
+        try
+        {
+            index->scanNext(scanRid);
+            bufMgr->readPage(file1, scanRid.page_number, curPage);
+            RECORD myRec = *(reinterpret_cast<const RECORD*>(curPage->getRecord(scanRid).data()));
+            bufMgr->unPinPage(file1, scanRid.page_number, false);
 
-		numResults++;
-	}
+            if( numResults < 5 )
+            {
+                std::cout << "at:" << scanRid.page_number << "," << scanRid.slot_number;
+                std::cout << " -->:" << myRec.i << ":" << myRec.d << ":" << myRec.s << ":" <<std::endl;
+            }
+            else if( numResults == 5 )
+            {
+                std::cout << "..." << std::endl;
+            }
+        }
+        catch(const IndexScanCompletedException &e)
+        {
+            break;
+        }
 
-  if( numResults >= 5 )
-  {
-    std::cout << "Number of results: " << numResults << std::endl;
-  }
-  index->endScan();
-  std::cout << std::endl;
+        numResults++;
+    }
 
-	return numResults;
+    if( numResults >= 5 )
+    {
+        std::cout << "Number of results: " << numResults << std::endl;
+    }
+    index->endScan();
+    std::cout << std::endl;
+
+    return numResults;
 }
 
 // -----------------------------------------------------------------------------
@@ -524,139 +440,139 @@ int intScan(BTreeIndex * index, int lowVal, Operator lowOp, int highVal, Operato
 
 void errorTests()
 {
-	{
-		std::cout << "Error handling tests" << std::endl;
-		std::cout << "--------------------" << std::endl;
-		// Given error test
+    {
+        std::cout << "Error handling tests" << std::endl;
+        std::cout << "--------------------" << std::endl;
+        // Given error test
 
-		try
-		{
-			File::remove(relationName);
-		}
-		catch(const FileNotFoundException &e)
-		{
-		}
+        try
+        {
+            File::remove(relationName);
+        }
+        catch(const FileNotFoundException &e)
+        {
+        }
 
-		file1 = new PageFile(relationName, true);
-		
-		// initialize all of record1.s to keep purify happy
-		memset(record1.s, ' ', sizeof(record1.s));
-		PageId new_page_number;
-		Page new_page = file1->allocatePage(new_page_number);
+        file1 = new PageFile(relationName, true);
 
-		// Insert a bunch of tuples into the relation.
-		for(int i = 0; i <10; i++ ) 
-		{
-		  sprintf(record1.s, "%05d string record", i);
-		  record1.i = i;
-		  record1.d = (double)i;
-		  std::string new_data(reinterpret_cast<char*>(&record1), sizeof(record1));
+        // initialize all of record1.s to keep purify happy
+        memset(record1.s, ' ', sizeof(record1.s));
+        PageId new_page_number;
+        Page new_page = file1->allocatePage(new_page_number);
 
-			while(1)
-			{
-				try
-				{
-		  		new_page.insertRecord(new_data);
-					break;
-				}
-				catch(const InsufficientSpaceException &e)
-				{
-					file1->writePage(new_page_number, new_page);
-					new_page = file1->allocatePage(new_page_number);
-				}
-			}
-		}
+        // Insert a bunch of tuples into the relation.
+        for(int i = 0; i <10; i++ )
+        {
+            sprintf(record1.s, "%05d string record", i);
+            record1.i = i;
+            record1.d = (double)i;
+            std::string new_data(reinterpret_cast<char*>(&record1), sizeof(record1));
 
-		file1->writePage(new_page_number, new_page);
+            while(1)
+            {
+                try
+                {
+                    new_page.insertRecord(new_data);
+                    break;
+                }
+                catch(const InsufficientSpaceException &e)
+                {
+                    file1->writePage(new_page_number, new_page);
+                    new_page = file1->allocatePage(new_page_number);
+                }
+            }
+        }
 
-		BTreeIndex index(relationName, intIndexName, bufMgr, offsetof(tuple,i), INTEGER);
-		
-		int int2 = 2;
-		int int5 = 5;
+        file1->writePage(new_page_number, new_page);
 
-		// Scan Tests
-		std::cout << "Call endScan before startScan" << std::endl;
-		try
-		{
-			index.endScan();
-			std::cout << "ScanNotInitialized Test 1 Failed." << std::endl;
-		}
-		catch(const ScanNotInitializedException &e)
-		{
-			std::cout << "ScanNotInitialized Test 1 Passed." << std::endl;
-		}
-		
-		std::cout << "Call scanNext before startScan" << std::endl;
-		try
-		{
-			RecordId foo;
-			index.scanNext(foo);
-			std::cout << "ScanNotInitialized Test 2 Failed." << std::endl;
-		}
-		catch(const ScanNotInitializedException &e)
-		{
-			std::cout << "ScanNotInitialized Test 2 Passed." << std::endl;
-		}
-		
-		std::cout << "Scan with bad lowOp" << std::endl;
-		try
-		{
-			index.startScan(&int2, LTE, &int5, LTE);
-			std::cout << "BadOpcodesException Test 1 Failed." << std::endl;
-		}
-		catch(const BadOpcodesException &e)
-		{
-			std::cout << "BadOpcodesException Test 1 Passed." << std::endl;
-		}
-		
-		std::cout << "Scan with bad highOp" << std::endl;
-		try
-		{
-			index.startScan(&int2, GTE, &int5, GTE);
-			std::cout << "BadOpcodesException Test 2 Failed." << std::endl;
-		}
-		catch(const BadOpcodesException &e)
-		{
-			std::cout << "BadOpcodesException Test 2 Passed." << std::endl;
-		}
+        BTreeIndex index(relationName, intIndexName, bufMgr, offsetof(tuple,i), INTEGER);
+
+        int int2 = 2;
+        int int5 = 5;
+
+        // Scan Tests
+        std::cout << "Call endScan before startScan" << std::endl;
+        try
+        {
+            index.endScan();
+            std::cout << "ScanNotInitialized Test 1 Failed." << std::endl;
+        }
+        catch(const ScanNotInitializedException &e)
+        {
+            std::cout << "ScanNotInitialized Test 1 Passed." << std::endl;
+        }
+
+        std::cout << "Call scanNext before startScan" << std::endl;
+        try
+        {
+            RecordId foo;
+            index.scanNext(foo);
+            std::cout << "ScanNotInitialized Test 2 Failed." << std::endl;
+        }
+        catch(const ScanNotInitializedException &e)
+        {
+            std::cout << "ScanNotInitialized Test 2 Passed." << std::endl;
+        }
+
+        std::cout << "Scan with bad lowOp" << std::endl;
+        try
+        {
+            index.startScan(&int2, LTE, &int5, LTE);
+            std::cout << "BadOpcodesException Test 1 Failed." << std::endl;
+        }
+        catch(const BadOpcodesException &e)
+        {
+            std::cout << "BadOpcodesException Test 1 Passed." << std::endl;
+        }
+
+        std::cout << "Scan with bad highOp" << std::endl;
+        try
+        {
+            index.startScan(&int2, GTE, &int5, GTE);
+            std::cout << "BadOpcodesException Test 2 Failed." << std::endl;
+        }
+        catch(const BadOpcodesException &e)
+        {
+            std::cout << "BadOpcodesException Test 2 Passed." << std::endl;
+        }
 
 
-		std::cout << "Scan with bad range" << std::endl;
-		try
-		{
-			index.startScan(&int5, GTE, &int2, LTE);
-			std::cout << "BadScanrangeException Test 1 Failed." << std::endl;
-		}
-		catch(const BadScanrangeException &e)
-		{
-			std::cout << "BadScanrangeException Test 1 Passed." << std::endl;
-		}
+        std::cout << "Scan with bad range" << std::endl;
+        try
+        {
+            index.startScan(&int5, GTE, &int2, LTE);
+            std::cout << "BadScanrangeException Test 1 Failed." << std::endl;
+        }
+        catch(const BadScanrangeException &e)
+        {
+            std::cout << "BadScanrangeException Test 1 Passed." << std::endl;
+        }
 
-		deleteRelation();
-	}
+        deleteRelation();
+    }
 
-	try
-	{
-		File::remove(intIndexName);
-	}
-  catch(const FileNotFoundException &e)
-  {
-  }
+    try
+    {
+        File::remove(intIndexName);
+    }
+    catch(const FileNotFoundException &e)
+    {
+    }
 }
 
 void deleteRelation()
 {
-	if(file1)
-	{
-		bufMgr->flushFile(file1);
-		delete file1;
-		file1 = NULL;
-	}
-	try
-	{
-		File::remove(relationName);
-	}
-	catch(const FileNotFoundException &e)
-	{
-	}
+    if(file1)
+    {
+        bufMgr->flushFile(file1);
+        delete file1;
+        file1 = NULL;
+    }
+    try
+    {
+        File::remove(relationName);
+    }
+    catch(const FileNotFoundException &e)
+    {
+    }
 }
