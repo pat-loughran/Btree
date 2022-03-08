@@ -16,6 +16,7 @@
 #include "exceptions/index_scan_completed_exception.h"
 #include "exceptions/file_not_found_exception.h"
 #include "exceptions/end_of_file_exception.h"
+#include "exceptions/page_not_pinned_exception.h"
 
 
 //#define DEBUG
@@ -249,7 +250,7 @@ bool BTreeIndex::insertInFirstPage(int keyInt, RecordId rid, NonLeafNodeInt* roo
         bufMgr->unPinPage(file, root->pageNoArray[0], false);
         return false;
     }
-    insertHelper(true, insertIndex, keyInt, rid, root, firstNode);
+    insertHelper(false, insertIndex, keyInt, rid, root, firstNode);
     return true;
 
 }
@@ -322,7 +323,12 @@ void BTreeIndex::findPlace(int keyInt, NonLeafNodeInt* curRoot, PageId curRootPa
             bufMgr->readPage(file, curRoot->pageNoArray[i+1], nextRootPage);
             NonLeafNodeInt* nextRoot = reinterpret_cast<NonLeafNodeInt*>(nextRootPage);
             PageId nextRootPageId = curRoot->pageNoArray[i+1];
-            bufMgr->unPinPage(file, curRootPageId, false);
+            try {
+                bufMgr->unPinPage(file, curRootPageId, false);
+            }
+            catch (PageNotPinnedException &e) {
+                std::cout << "unpin error: 330\n";
+            }
             findPlace(keyInt, nextRoot, nextRootPageId, index, leafHolder, leafHolderPageId);
         }
     }
@@ -339,7 +345,7 @@ bool BTreeIndex::easyInsert(int keyInt, RecordId rid, NonLeafNodeInt* root, int 
         return false;
     }
     int leaf_index = findInsertIndex(keyInt, leaf);
-    insertHelper(false, leaf_index, keyInt, rid, leafHolder, leaf);
+    insertHelper(true, leaf_index, keyInt, rid, leafHolder, leaf);
     bufMgr->unPinPage(file, leafPageId, true);
     return true;
 }
@@ -441,7 +447,9 @@ void BTreeIndex::insertEntry(const void *key, const RecordId rid)
     }
 
     //needs to be set to force first insertion into full child
-    root->keyArray[0] = INT_MAX;
+    if (numPages == 3) {
+        root->keyArray[0] = INT_MAX;
+    }
 
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////
     // regular insert logic from here
@@ -464,8 +472,30 @@ void BTreeIndex::insertEntry(const void *key, const RecordId rid)
 
     // try to insert keyInt and rid. If it works without splits, we done
     if (easyInsert(keyInt, rid, root, index, leafHolder) ) {
-        bufMgr->unPinPage(file, leafHolderPageId, false);
-        bufMgr->unPinPage(file, rootPageNum, false);
+        
+         Page* firstChildPage;
+         bufMgr->readPage(file, root->pageNoArray[0], firstChildPage);
+         LeafNodeInt* firstChild = reinterpret_cast<LeafNodeInt*>(firstChildPage);
+         bufMgr->unPinPage(file, root->pageNoArray[0], false);
+        
+
+        try {
+            bufMgr->unPinPage(file, leafHolderPageId, false);
+        }
+        catch (PageNotPinnedException &e) {
+            std::cout << "unpin error: 477\n";
+        }
+        if (rootPageNum != leafHolderPageId) {
+        try {
+            bufMgr->unPinPage(file, rootPageNum, false);
+        }
+        catch (PageNotPinnedException &e) {
+            std::cout << "unpin error: 478\n";
+        }
+        }
+
+
+        
         return;
     }
 
@@ -527,10 +557,17 @@ void BTreeIndex::insertEntry(const void *key, const RecordId rid)
     oldLeaf->rightSibPageNo = newLeafPageId;
     NonLeafNodeInsertHelper(index, newLeaf->keyArray[0], newLeafPageId, leafHolder);
 
-
-        
-
-
+    try {
+    bufMgr->unPinPage(file, rootPageNum, true);
+    bufMgr->unPinPage(file, leafHolder->pageNoArray[index], true);
+    if (leafHolderPageId != rootPageNum) {
+        bufMgr->unPinPage(file, leafHolderPageId, true);
+    }
+    bufMgr->unPinPage(file, newLeafPageId, true);
+    }
+    catch (PageNotPinnedException &e) {
+    }
+    numPages++;
 
 }
 // -----------------------------------------------------------------------------
