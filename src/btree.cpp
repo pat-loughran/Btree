@@ -135,7 +135,7 @@ int BTreeIndex::findInsertIndex(int keyInt, LeafNodeInt* curNode)
     return -1; //Error if code reached
 }
 
-int findInsertIndexArr(int keyInt, int* arr)
+int BTreeIndex::findInsertIndexArr(int keyInt, int* arr)
 {
     if (keyInt > arr[INTARRAYLEAFSIZE]) {
         return INTARRAYLEAFSIZE;
@@ -277,13 +277,13 @@ void BTreeIndex::findPlace(int keyInt, NonLeafNodeInt* curRoot, PageId curRootPa
     leafHolderPageId = curRootPageId;
     for (int i = 0; i < INTARRAYNONLEAFSIZE; i++) {
         // key belongs in end and at level 1
-        if ((i = INTARRAYNONLEAFSIZE-1) && (keyInt > curRoot->keyArray[i]) && (curRoot->level == 1)) {
+        if ((i == INTARRAYNONLEAFSIZE-1) && (keyInt > curRoot->keyArray[i]) && (curRoot->level == 1)) {
             leafHolder = curRoot;
             index = i + 1;
             return;
         }
         // key belongs in end and at level 0
-        else if ((i = INTARRAYNONLEAFSIZE-1) && (keyInt > curRoot->keyArray[i])) {
+        else if ((i == INTARRAYNONLEAFSIZE-1) && (keyInt > curRoot->keyArray[i])) {
             Page* nextRootPage;
             bufMgr->readPage(file, curRoot->pageNoArray[i+1], nextRootPage);
             NonLeafNodeInt* nextRoot = reinterpret_cast<NonLeafNodeInt*>(nextRootPage);
@@ -481,6 +481,7 @@ void BTreeIndex::insertEntry(const void *key, const RecordId rid)
     Page* oldLeafPage;
     bufMgr->readPage(file, leafHolder->pageNoArray[index], oldLeafPage);
     LeafNodeInt* oldLeaf = reinterpret_cast<LeafNodeInt*>(oldLeafPage);
+    PageId oldLeafSib = oldLeaf->rightSibPageNo;
 
 
     // create new leaf
@@ -522,7 +523,7 @@ void BTreeIndex::insertEntry(const void *key, const RecordId rid)
         }
     
     //perform split
-    newLeaf->rightSibPageNo = leafHolder->pageNoArray[index];
+    newLeaf->rightSibPageNo = oldLeafSib
     oldLeaf->rightSibPageNo = newLeafPageId;
     NonLeafNodeInsertHelper(index, newLeaf->keyArray[0], newLeafPageId, leafHolder);
 
