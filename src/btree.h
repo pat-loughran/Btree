@@ -310,35 +310,7 @@ class BTreeIndex {
 
   
   
-  void initalizeNonLeafNode(NonLeafNodeInt* nonLeafNode);
 
-  void initalizeLeafNode(LeafNodeInt* leafNode);
-
-  void handleAlreadyPresent(std::string indexName, BufMgr *bufMgrIn, std::string relationName, const int attrByteOffset, const Datatype attrType);
-
-  void handleNew(std::string indexName, BufMgr *bufMgrIn, std::string relationName, const int attrByteOffset, const Datatype attrType);
-
-  void createFirstChild(int keyInt, RecordId rid, NonLeafNodeInt* root);
-  
-  bool insertInFirstPage(int keyInt, RecordId rid, NonLeafNodeInt* root);
-
-  int findInsertIndex(int KeyInt, LeafNodeInt* curNode);
-
-  int findInsertIndexArr(int keyInt, int* arr);
-
-  int findInsertIndexSplit(int keyInt, LeafNodeInt* curNode);
-
-  void insertHelper(bool regular, int index, int keyInt, RecordId rid, NonLeafNodeInt* root, LeafNodeInt* firstNode);
-
-  void insertHelperArr(int index, int keyInt, int* arr, RecordId* arrR, RecordId rid);
-
-  void NonLeafNodeInsertHelper(int index, int keyInt, PageId pageNo, NonLeafNodeInt* leafHolder);
-
-  void findPlace(int keyInt, NonLeafNodeInt* curRoot, PageId curRootPageId, int& index, NonLeafNodeInt*& leafHolder, PageId& leafHolderPageId);
-
-  bool easyInsert(int keyInt, RecordId rid, NonLeafNodeInt* root, int index, NonLeafNodeInt* leafHolder);
-
- 
 	
  public:
 
@@ -413,7 +385,35 @@ class BTreeIndex {
 	 * @throws ScanNotInitializedException If no scan has been initialized.
 	**/
 	void endScan();
-	
+    void initalizeNonLeafNode(NonLeafNodeInt* nonLeafNode);
+
+    void initalizeLeafNode(LeafNodeInt* leafNode);
+
+    void handleAlreadyPresent(std::string indexName, BufMgr *bufMgrIn, std::string relationName, const int attrByteOffset, const Datatype attrType);
+
+    void handleNew(std::string indexName, BufMgr *bufMgrIn, std::string relationName, const int attrByteOffset, const Datatype attrType);
+
+    void createFirstChild(int keyInt, RecordId rid, NonLeafNodeInt* root);
+
+    bool insertInFirstPage(int keyInt, RecordId rid, NonLeafNodeInt* root);
+
+    int findInsertIndex(int KeyInt, LeafNodeInt* curNode);
+
+    int findInsertIndexArr(int keyInt, int* arr);
+
+    int findInsertIndexSplit(int keyInt, LeafNodeInt* curNode);
+
+    void insertHelper(bool regular, int index, int keyInt, RecordId rid, NonLeafNodeInt* root, LeafNodeInt* firstNode);
+
+    void insertHelperArr(int index, int keyInt, int* arr, RecordId* arrR, RecordId rid);
+
+    void NonLeafNodeInsertHelper(int index, int keyInt, PageId pageNo, NonLeafNodeInt* leafHolder);
+
+    void findPlace(int keyInt, NonLeafNodeInt* curRoot, PageId curRootPageId, int& index, NonLeafNodeInt*& leafHolder, PageId& leafHolderPageId);
+
+    bool easyInsert(int keyInt, RecordId rid, NonLeafNodeInt* root, int index, NonLeafNodeInt* leafHolder);
+
+
 };
 
 }
