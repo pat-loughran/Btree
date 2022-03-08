@@ -153,7 +153,7 @@ struct NonLeafNodeInt{
    * Level of the node in the tree.
    */
 	int level;
-    bool isLeaf;
+  bool isLeaf;
   /**
    * Stores keys.
    */
@@ -324,7 +324,13 @@ class BTreeIndex {
 
   int findInsertIndex(int KeyInt, LeafNodeInt* curNode);
 
-  void insertHelper(int index, int keyInt, RecordId rid, NonLeafNodeInt* root, LeafNodeInt* firstNode);
+  void insertHelper(bool regular, int index, int keyInt, RecordId rid, NonLeafNodeInt* root, LeafNodeInt* firstNode);
+
+  void findPlace(int keyInt, NonLeafNodeInt* curRoot, PageId curRootPageId, int& index, NonLeafNodeInt*& leafHolder, PageId& leafHolderPageId);
+
+  bool easyInsert(int keyInt, RecordId rid, NonLeafNodeInt* root, int index, NonLeafNodeInt* leafHolder);
+
+ 
 	
  public:
 

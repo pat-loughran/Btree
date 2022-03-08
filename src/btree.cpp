@@ -135,7 +135,7 @@ int BTreeIndex::findInsertIndex(int keyInt, LeafNodeInt* curNode)
     return -1; //Error if code reached
 }
 
-void BTreeIndex::insertHelper(int index, int keyInt, RecordId rid, NonLeafNodeInt* root, LeafNodeInt* firstNode)
+void BTreeIndex::insertHelper(bool regular, int index, int keyInt, RecordId rid, NonLeafNodeInt* root, LeafNodeInt* firstNode)
 {
     int rootValue = INT_MAX;
     // key is going to be furthest in page
@@ -159,11 +159,15 @@ void BTreeIndex::insertHelper(int index, int keyInt, RecordId rid, NonLeafNodeIn
         firstNode->ridArray[index] = rid;
     }
     //update root key
-    root->keyArray[0] = rootValue+1;
+    if (!regular){
+        root->keyArray[0] = rootValue+1;
+    }
     
     //unpin root and firstPage
+    if (!regular){
     bufMgr->unPinPage(file, (PageId)2, true);
     bufMgr->unPinPage(file, root->pageNoArray[0], true);
+    }
 
 }
 
@@ -177,7 +181,7 @@ bool BTreeIndex::insertInFirstPage(int keyInt, RecordId rid, NonLeafNodeInt* roo
         bufMgr->unPinPage(file, root->pageNoArray[0], false);
         return false;
     }
-    insertHelper(insertIndex, keyInt, rid, root, firstNode);
+    insertHelper(true, insertIndex, keyInt, rid, root, firstNode);
     return true;
 
 }
@@ -198,6 +202,78 @@ void BTreeIndex::initalizeLeafNode(LeafNodeInt* leafNode) {
         }
     leafNode->rightSibPageNo = 0;
     leafNode->isLeaf = true;
+}
+
+void BTreeIndex::findPlace(int keyInt, NonLeafNodeInt* curRoot, PageId curRootPageId, int& index, NonLeafNodeInt*& leafHolder, PageId& leafHolderPageId)
+{
+    leafHolderPageId = curRootPageId;
+    for (int i = 0; i < INTARRAYNONLEAFSIZE; i++) {
+        // key belongs in end and at level 1
+        if (i = INTARRAYNONLEAFSIZE-1 && keyInt > curRoot->keyArray[i] && curRoot->level == 1) {
+            leafHolder = curRoot;
+            index = i + 1;
+            return;
+        }
+        // key belongs in end and at level 0
+        else if (i = INTARRAYNONLEAFSIZE-1 && keyInt > curRoot->keyArray[i]) {
+            Page* nextRootPage;
+            bufMgr->readPage(file, curRoot->pageNoArray[i+1], nextRootPage);
+            NonLeafNodeInt* nextRoot = reinterpret_cast<NonLeafNodeInt*>(nextRootPage);
+            PageId nextRootPageId = curRoot->pageNoArray[i+1];
+            bufMgr->unPinPage(file, curRootPageId, false);
+            findPlace(keyInt, nextRoot, nextRootPageId, index, leafHolder, leafHolderPageId);
+        }
+
+        int currentKey = curRoot->keyArray[i];
+        int nextKey = curRoot->keyArray[i+1];
+
+        // smaller than first key and at level 1
+        if (i == 0 && keyInt < currentKey && curRoot->level == 1) {
+            leafHolder = curRoot;
+            index = 0;
+            return;
+        }
+        // smaller than first key at level 0
+        else if (i == 0 && keyInt < currentKey) {
+            Page* nextRootPage;
+            bufMgr->readPage(file, curRoot->pageNoArray[0], nextRootPage);
+            NonLeafNodeInt* nextRoot = reinterpret_cast<NonLeafNodeInt*>(nextRootPage);
+            PageId nextRootPageId = curRoot->pageNoArray[0];
+            bufMgr->unPinPage(file, curRootPageId, false);
+            findPlace(keyInt, nextRoot, nextRootPageId, index, leafHolder, leafHolderPageId);
+        }
+        // found somewhere in middle at level 1
+        if (keyInt >= currentKey && keyInt < nextKey && curRoot->level == 1) {
+            leafHolder = curRoot;
+            index = i+1;
+            return;
+        }
+        // found somewhere in middle at level 0
+        else if (keyInt >= currentKey && keyInt < nextKey) {
+            Page* nextRootPage;
+            bufMgr->readPage(file, curRoot->pageNoArray[i+1], nextRootPage);
+            NonLeafNodeInt* nextRoot = reinterpret_cast<NonLeafNodeInt*>(nextRootPage);
+            PageId nextRootPageId = curRoot->pageNoArray[i+1];
+            bufMgr->unPinPage(file, curRootPageId, false);
+            findPlace(keyInt, nextRoot, nextRootPageId, index, leafHolder, leafHolderPageId);
+        }
+    }
+}
+
+bool BTreeIndex::easyInsert(int keyInt, RecordId rid, NonLeafNodeInt* root, int index, NonLeafNodeInt* leafHolder)
+{
+    //try to insert
+    PageId leafPageId = leafHolder->pageNoArray[index];
+    Page* leafPage;
+    bufMgr->readPage(file, leafPageId, leafPage);
+    LeafNodeInt* leaf = reinterpret_cast<LeafNodeInt*>(leafPage);
+    if (leaf->keyArray[INTARRAYLEAFSIZE-1] != INT_MAX) {
+        return false;
+    }
+    int leaf_index = findInsertIndex(keyInt, leaf);
+    insertHelper(false, leaf_index, keyInt, rid, leafHolder, leaf);
+    bufMgr->unPinPage(file, leafPageId, true);
+    return true;
 }
 
 // -----------------------------------------------------------------------------
@@ -259,7 +335,6 @@ BTreeIndex::BTreeIndex(const std::string & relationName,
 BTreeIndex::~BTreeIndex()
 {
 
-
     if(scanExecuting){
         endScan();
     }
@@ -297,17 +372,37 @@ void BTreeIndex::insertEntry(const void *key, const RecordId rid)
         }
     }
 
-    
+    //needs to be set to force first insertion into full child
+    root->keyArray[0] = INT_MAX;
 
-    // at this point, we have a regualr B+ tree where the root node is always a nonleaf node
-    // If this is the first time we are reaching this part of execution, then the root Pages first child is full
-    // So we have                   (root)
-    //                              /
-    //                        (LeafNode)
-    // The next Key/Rid pair to be inserted will cause a split that needs to be handled below among any other
-    // regular insert logic
-    //
-    //remember to unpin the root page and any other pages you visit when you are done with them
+    ////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    // regular insert logic from here
+    ////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+    //search and detrmine if there is space
+    int index;                     // to be filled in by reference
+    NonLeafNodeInt* leafHolder;    // to be filled in by reference
+    PageId leafHolderPageId;       // to be filled in by reference
+
+    // find PageId index and leafHolder Page
+    findPlace(keyInt, root, rootPageNum, index, leafHolder, leafHolderPageId);
+     // if leafHolder is not root, then root was unpinned
+     if (leafHolderPageId != rootPageNum) {
+         Page* rrootPage;
+         bufMgr->readPage(file, rootPageNum, rrootPage);
+         root = reinterpret_cast<NonLeafNodeInt*>(rootPage);
+     
+    }
+
+    // try to insert keyInt and rid. If it works without splits, we done
+    if (easyInsert(keyInt, rid, root, index, leafHolder) ) {
+        bufMgr->unPinPage(file, leafHolderPageId, false);
+        bufMgr->unPinPage(file, rootPageNum, false);
+        return;
+    }
+
+    //leaf is full, must split :/
+
 }
 // -----------------------------------------------------------------------------
 // BTreeIndex::startScan Helper
