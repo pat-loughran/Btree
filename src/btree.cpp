@@ -217,7 +217,7 @@ void BTreeIndex::insertHelper(bool regular, int index, int keyInt, RecordId rid,
 
  void BTreeIndex::insertHelperArr(int index, int keyInt, int* arr, RecordId* arrR, RecordId rid)
  {
-    for (int i = INTARRAYLEAFSIZE; i >= index; i++) {
+    for (int i = INTARRAYLEAFSIZE; i >= index; i--) {
         if (arr[i] != INT_MAX) {
             arr[i+1] = arr[i];
             arrR[i+1] = arrR[i];
