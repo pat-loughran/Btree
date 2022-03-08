@@ -191,14 +191,15 @@ void BTreeIndex::insertHelper(bool regular, int index, int keyInt, RecordId rid,
         rootValue = keyInt;
     }
     else {
-        for (int i = INTARRAYLEAFSIZE-1; i >= index; i--) {
-            if (firstNode->keyArray[i] != INT_MAX) {
-                firstNode->keyArray[i+1] = firstNode->keyArray[i];
-                firstNode->ridArray[i+1] = firstNode->ridArray[i];
-                if (rootValue == INT_MAX) {
+        int i = INTARRAYLEAFSIZE - 2; // starts at second to last element since we know last element is intmax
+
+        while (i+1 > index) { // shift all values before index of new key one to the right (replace last with second to last (avoids index out of bounds))
+           firstNode->keyArray[i+1] = firstNode->keyArray[i];
+           firstNode->ridArray[i+1] = firstNode->ridArray[i];
+           if (rootValue == INT_MAX) {
                     rootValue = firstNode->keyArray[i+1];
                 }
-            }
+           i--;
         }
         firstNode->keyArray[index] = keyInt;
         firstNode->ridArray[index] = rid;
@@ -218,7 +219,7 @@ void BTreeIndex::insertHelper(bool regular, int index, int keyInt, RecordId rid,
 
  void BTreeIndex::insertHelperArr(int index, int keyInt, int* arr, RecordId* arrR, RecordId rid)
  {
-    for (int i = INTARRAYLEAFSIZE; i >= index; i++) {
+    for (int i = INTARRAYLEAFSIZE; i >= index; i--) {
         if (arr[i] != INT_MAX) {
             arr[i+1] = arr[i];
             arrR[i+1] = arrR[i];
@@ -250,7 +251,7 @@ bool BTreeIndex::insertInFirstPage(int keyInt, RecordId rid, NonLeafNodeInt* roo
         bufMgr->unPinPage(file, root->pageNoArray[0], false);
         return false;
     }
-    insertHelper(true, insertIndex, keyInt, rid, root, firstNode);
+    insertHelper(false, insertIndex, keyInt, rid, root, firstNode);
     return true;
 
 }
@@ -323,7 +324,12 @@ void BTreeIndex::findPlace(int keyInt, NonLeafNodeInt* curRoot, PageId curRootPa
             bufMgr->readPage(file, curRoot->pageNoArray[i+1], nextRootPage);
             NonLeafNodeInt* nextRoot = reinterpret_cast<NonLeafNodeInt*>(nextRootPage);
             PageId nextRootPageId = curRoot->pageNoArray[i+1];
-            bufMgr->unPinPage(file, curRootPageId, false);
+            try {
+                bufMgr->unPinPage(file, curRootPageId, false);
+            }
+            catch (PageNotPinnedException &e) {
+                std::cout << "unpin error: 330\n";
+            }
             findPlace(keyInt, nextRoot, nextRootPageId, index, leafHolder, leafHolderPageId);
         }
     }
@@ -442,7 +448,9 @@ void BTreeIndex::insertEntry(const void *key, const RecordId rid)
     }
 
     //needs to be set to force first insertion into full child
-    root->keyArray[0] = INT_MAX;
+    if (numPages == 3) {
+        root->keyArray[0] = INT_MAX;
+    }
 
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////
     // regular insert logic from here
@@ -465,8 +473,30 @@ void BTreeIndex::insertEntry(const void *key, const RecordId rid)
 
     // try to insert keyInt and rid. If it works without splits, we done
     if (easyInsert(keyInt, rid, root, index, leafHolder) ) {
-        bufMgr->unPinPage(file, leafHolderPageId, false);
-        bufMgr->unPinPage(file, rootPageNum, false);
+        
+         Page* firstChildPage;
+         bufMgr->readPage(file, root->pageNoArray[0], firstChildPage);
+         LeafNodeInt* firstChild = reinterpret_cast<LeafNodeInt*>(firstChildPage);
+         bufMgr->unPinPage(file, root->pageNoArray[0], false);
+        
+
+        try {
+            bufMgr->unPinPage(file, leafHolderPageId, false);
+        }
+        catch (PageNotPinnedException &e) {
+            std::cout << "unpin error: 477\n";
+        }
+        if (rootPageNum != leafHolderPageId) {
+        try {
+            bufMgr->unPinPage(file, rootPageNum, false);
+        }
+        catch (PageNotPinnedException &e) {
+            std::cout << "unpin error: 478\n";
+        }
+        }
+
+
+        
         return;
     }
 
@@ -528,10 +558,17 @@ void BTreeIndex::insertEntry(const void *key, const RecordId rid)
     oldLeaf->rightSibPageNo = newLeafPageId;
     NonLeafNodeInsertHelper(index, newLeaf->keyArray[0], newLeafPageId, leafHolder);
 
-
-        
-
-
+    try {
+    bufMgr->unPinPage(file, rootPageNum, true);
+    bufMgr->unPinPage(file, leafHolder->pageNoArray[index], true);
+    if (leafHolderPageId != rootPageNum) {
+        bufMgr->unPinPage(file, leafHolderPageId, true);
+    }
+    bufMgr->unPinPage(file, newLeafPageId, true);
+    }
+    catch (PageNotPinnedException &e) {
+    }
+    numPages++;
 
 }
 // -----------------------------------------------------------------------------
@@ -589,10 +626,10 @@ void BTreeIndex::startScan(const void* lowValParm,
     lowOp = lowOpParm;
     highOp = highOpParm;
 
-    if (lowValInt >highValInt) {
+    if (lowValInt > highValInt) {
         throw BadScanrangeException();
     }
-    if(scanExecuting)
+    if(scanExecuting == true)
     {
         endScan();
     }
@@ -675,8 +712,9 @@ void BTreeIndex::scanNext(RecordId& outRid)
 //
 void BTreeIndex::endScan() 
 {
-    if (!scanExecuting){
-        throw ScanNotInitializedException();
+
+    if (!scanExecuting){ //check if scanexe is fale
+        throw ScanNotInitializedException(); // is false throw exception
     }
 
     scanExecuting = false;
