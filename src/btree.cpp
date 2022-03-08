@@ -191,14 +191,15 @@ void BTreeIndex::insertHelper(bool regular, int index, int keyInt, RecordId rid,
         rootValue = keyInt;
     }
     else {
-        for (int i = INTARRAYLEAFSIZE-1; i >= index; i--) {
-            if (firstNode->keyArray[i] != INT_MAX) {
-                firstNode->keyArray[i+1] = firstNode->keyArray[i];
-                firstNode->ridArray[i+1] = firstNode->ridArray[i];
-                if (rootValue == INT_MAX) {
+        int i = INTARRAYLEAFSIZE - 2; // starts at second to last element since we know last element is intmax
+
+        while (i+1 > index) { // shift all values before index of new key one to the right (replace last with second to last (avoids index out of bounds))
+           firstNode->keyArray[i+1] = firstNode->keyArray[i];
+           firstNode->ridArray[i+1] = firstNode->ridArray[i];
+           if (rootValue == INT_MAX) {
                     rootValue = firstNode->keyArray[i+1];
                 }
-            }
+           i--;
         }
         firstNode->keyArray[index] = keyInt;
         firstNode->ridArray[index] = rid;
@@ -625,10 +626,10 @@ void BTreeIndex::startScan(const void* lowValParm,
     lowOp = lowOpParm;
     highOp = highOpParm;
 
-    if (lowValInt >highValInt) {
+    if (lowValInt > highValInt) {
         throw BadScanrangeException();
     }
-    if(scanExecuting)
+    if(scanExecuting == true)
     {
         endScan();
     }
@@ -710,8 +711,9 @@ void BTreeIndex::scanNext(RecordId& outRid)
 //
 void BTreeIndex::endScan() 
 {
-    if (!scanExecuting){
-        throw ScanNotInitializedException();
+
+    if (!scanExecuting){ //check if scanexe is fale
+        throw ScanNotInitializedException(); // is false throw exception
     }
 
     scanExecuting = false;
