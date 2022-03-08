@@ -16,6 +16,7 @@
 #include "exceptions/index_scan_completed_exception.h"
 #include "exceptions/file_not_found_exception.h"
 #include "exceptions/end_of_file_exception.h"
+#include "exceptions/page_not_pinned_exception.h"
 
 
 //#define DEBUG
@@ -339,7 +340,7 @@ bool BTreeIndex::easyInsert(int keyInt, RecordId rid, NonLeafNodeInt* root, int 
         return false;
     }
     int leaf_index = findInsertIndex(keyInt, leaf);
-    insertHelper(false, leaf_index, keyInt, rid, leafHolder, leaf);
+    insertHelper(true, leaf_index, keyInt, rid, leafHolder, leaf);
     bufMgr->unPinPage(file, leafPageId, true);
     return true;
 }
@@ -604,7 +605,7 @@ void BTreeIndex::startScan(const void* lowValParm,
 
 
         if (((lowOp == GTE && highOp == LTE) && (node->keyArray[i]<= highValInt && node->keyArray[i] >= lowValInt))
-        || ((lowOp == GT && highOp == LTE) && (node->keyArray[i]<= highValInt && node->keyArray[i] > lowValInt))
+        || ((lowOp == GTE && highOp == LT) && (node->keyArray[i]< highValInt && node->keyArray[i] >=lowValInt))
         || ((lowOp == GT && highOp == LTE) && (node->keyArray[i]<= highValInt && node->keyArray[i] > lowValInt))
         || ((lowOp == GT && highOp == LT) && (node->keyArray[i]< highValInt && node->keyArray[i] > lowValInt))
         )
@@ -631,19 +632,20 @@ void BTreeIndex::scanNext(RecordId& outRid)
          LeafNodeInt* node = ( LeafNodeInt*)(currentPageData);
 
 
-        if (node->ridArray[nextEntry].page_number == Page::INVALID_NUMBER)
+        if (node->keyArray[nextEntry] == INT_MAX)
         {
-            nextEntry = INTARRAYLEAFSIZE;
+            nextEntry = INTARRAYLEAFSIZE -1;
         }
 
 
-        if (nextEntry == INTARRAYLEAFSIZE)
+        if (nextEntry == INTARRAYLEAFSIZE -1)
         {
             if (node->rightSibPageNo != Page::INVALID_NUMBER)
             {
                 bufMgr->readPage(file,node->rightSibPageNo, currentPageData);
-                currentPageNum = node->rightSibPageNo;
+               
                 bufMgr->unPinPage(file, currentPageNum, false);
+                currentPageNum = node->rightSibPageNo;
                 nextEntry = 0;
             }
             else
