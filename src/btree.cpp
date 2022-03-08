@@ -523,7 +523,7 @@ void BTreeIndex::insertEntry(const void *key, const RecordId rid)
         }
     
     //perform split
-    newLeaf->rightSibPageNo = oldLeafSib
+    newLeaf->rightSibPageNo = oldLeafSib;
     oldLeaf->rightSibPageNo = newLeafPageId;
     NonLeafNodeInsertHelper(index, newLeaf->keyArray[0], newLeafPageId, leafHolder);
 
