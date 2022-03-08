@@ -219,8 +219,9 @@ BTreeIndex::BTreeIndex(const std::string & relationName,
     outIndexName = indexName;
 
     try {
-        BlobFile indexFile = BlobFile::open(indexName);
-        file = &indexFile;
+        //BlobFile indexFile = BlobFile::open(indexName);
+        //file = &indexFile;
+        file = new BlobFile(indexName, false);
         handleAlreadyPresent(indexName, bufMgrIn, relationName, attrByteOffset, attrType);
         return;
     }
@@ -229,8 +230,8 @@ BTreeIndex::BTreeIndex(const std::string & relationName,
     }
 
     //create actual Btree file in disc
-    BlobFile indexFile = BlobFile::create(indexName);
-    file = &indexFile;
+    file = new BlobFile(indexName, true);
+    
 
     //set up new file
     handleNew(indexName, bufMgrIn, relationName, attrByteOffset, attrType);
@@ -241,12 +242,8 @@ BTreeIndex::BTreeIndex(const std::string & relationName,
         RecordId rid;
         try {
             fs.scanNext(rid);
-            std::string recordStr = fs.getRecord();
-            const char* recordCStrC = recordStr.c_str();
-            char* recordCStr;
-            strcpy(recordCStr, recordCStrC);
-            void* key = recordCStr + attrByteOffset;  
-            insertEntry(key, rid);
+            std::string recordStr = fs.getRecord();  
+            insertEntry(&recordStr.c_str()[0] + attrByteOffset, rid);
             }
         catch (EndOfFileException &e) {
             break;
@@ -261,6 +258,8 @@ BTreeIndex::BTreeIndex(const std::string & relationName,
 
 BTreeIndex::~BTreeIndex()
 {
+
+
     if(scanExecuting){
         endScan();
     }
@@ -297,6 +296,8 @@ void BTreeIndex::insertEntry(const void *key, const RecordId rid)
             return;
         }
     }
+
+    
 
     // at this point, we have a regualr B+ tree where the root node is always a nonleaf node
     // If this is the first time we are reaching this part of execution, then the root Pages first child is full
