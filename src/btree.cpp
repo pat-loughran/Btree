@@ -680,9 +680,9 @@ void BTreeIndex::scanNext(RecordId& outRid)
             if (node->rightSibPageNo != Page::INVALID_NUMBER)
             {
                 bufMgr->readPage(file,node->rightSibPageNo, currentPageData);
-               
-                bufMgr->unPinPage(file, currentPageNum, false);
                 currentPageNum = node->rightSibPageNo;
+                bufMgr->unPinPage(file, currentPageNum, false);
+
                 nextEntry = 0;
             }
             else
