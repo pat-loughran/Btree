@@ -1,8 +1,0 @@
-Tests:
-We were asked to add two additional tests. We added three addition tests and commented out one due to long run time. Tested the splitting of non leaf node to verify our index implementation 
-is capable of indexing a large amount of relations.
-
-The second test we created was designed to check for negative numbers. Checking for negative numbers was tested since are implementation was supposed to not behave differently when processing negative number, i.e, our logic should also
-work for negative numbers.
-
-The third test we created was for testing an emptyTree. We wrote this test to check that our scan methods could handle a tree index made from a file with no records. We later learned from Piazza that this test case will not be tested.
