@@ -343,6 +343,7 @@ bool BTreeIndex::easyInsert(int keyInt, RecordId rid, NonLeafNodeInt* root, int 
     bufMgr->readPage(file, leafPageId, leafPage);
     LeafNodeInt* leaf = reinterpret_cast<LeafNodeInt*>(leafPage);
     if (leaf->keyArray[INTARRAYLEAFSIZE-1] != INT_MAX) {
+        bufMgr->unPinPage(file, leafPageId, true);
         return false;
     }
     int leaf_index = findInsertIndex(keyInt, leaf);
@@ -684,9 +685,9 @@ void BTreeIndex::scanNext(RecordId& outRid)
             if (node->rightSibPageNo != Page::INVALID_NUMBER)
             {
                 bufMgr->readPage(file,node->rightSibPageNo, currentPageData);
-               
-                bufMgr->unPinPage(file, currentPageNum, false);
                 currentPageNum = node->rightSibPageNo;
+                bufMgr->unPinPage(file, currentPageNum, false);
+
                 nextEntry = 0;
             }
             else
