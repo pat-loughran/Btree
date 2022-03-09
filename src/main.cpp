@@ -33,7 +33,18 @@
 		exit(1);																												\
 	}																																	\
 }
-
+/**
+* @file buffer.cpp
+* @author Zahaan Motiwala (9081204399)
+* @author Wilks-Boguszewicz (9079689890)
+* @author Patrick Loughran (9076650382)
+* @brief The main.cpp file will be used to run tests that test the correctness of the B+ tree implementation.
+* @version 0.1
+* @date 2022-02-16
+*
+* @copyright Copyright (c) 2022
+*
+*/
 using namespace badgerdb;
 
 // -----------------------------------------------------------------------------
@@ -148,7 +159,7 @@ int main(int argc, char **argv)
     test3();
 	testNegative();
 	testEmpyTree();
-	//testNonLeafSplit(); too long to run
+	//testNonLeafSplit(); //too long to run
     errorTests();
 
     delete bufMgr;
