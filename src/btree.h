@@ -390,33 +390,147 @@ namespace badgerdb
      * @throws ScanNotInitializedException If no scan has been initialized.
      **/
     void endScan();
-    void initalizeNonLeafNode(NonLeafNodeInt *nonLeafNode);
+   /**
+     * @brief initalizes the key array of node to INT_MAX and the pageNoArray to 0 (invalid page)
+     * 
+     * @param nonLeafNode - to be initalized
+     */
+    void initalizeNonLeafNode(NonLeafNodeInt* nonLeafNode);
 
-    void initalizeLeafNode(LeafNodeInt *leafNode);
+    /**
+     * @brief initalzies the leaf node by setting all keyArray elements to INT_MAX. ridArray doesn't need to be initalzied as its never used to search.
+     * 
+     * @param leafNode 
+     */
+    void initalizeLeafNode(LeafNodeInt* leafNode);
 
+    /**
+     * @brief called in constructor to set up instance fields if a b tree file already exists
+     * 
+     * @param indexName - name of the index file
+     * @param bufMgrIn - bufMgr for the index file
+     * @param relationName - name of the relation index is built on
+     * @param attrByteOffset - offset in bytes our key in the record is
+     * @param attrType - type of data were storing
+     */
     void handleAlreadyPresent(std::string indexName, BufMgr *bufMgrIn, std::string relationName, const int attrByteOffset, const Datatype attrType);
 
+    /**
+     * @brief called in constructor to set up new index file and build from scratch
+     *
+     * @param indexName - name of the index file
+     * @param bufMgrIn - bufMgr for the index file
+     * @param relationName - name of the relation index is built on
+     * @param attrByteOffset - offset in bytes our key in the record is
+     * @param attrType - type of data were storing
+     */
     void handleNew(std::string indexName, BufMgr *bufMgrIn, std::string relationName, const int attrByteOffset, const Datatype attrType);
 
-    void createFirstChild(int keyInt, RecordId rid, NonLeafNodeInt *root);
+    /**
+     * @brief Create a First Child object of index. Because our root is always a non leaf, first child is special and can have 0 - INTARRAYLEAFSIZE elements
+     * 
+     * @param keyInt - key of very first record
+     * @param rid - very first record
+     * @param root - root page of index
+     */
+    void createFirstChild(int keyInt, RecordId rid, NonLeafNodeInt* root);
 
-    bool insertInFirstPage(int keyInt, RecordId rid, NonLeafNodeInt *root);
+    /**
+     * @brief special case of when there is only one child node to root. We fill completly from scratch until full
+     * 
+     * @param keyInt - key to be inserted
+     * @param rid - rid to be inserted
+     * @param root - root of index
+     * @return true - if rid was inserted
+     * @return false - if rid was not inserted (first page is full)
+     */
+    bool insertInFirstPage(int keyInt, RecordId rid, NonLeafNodeInt* root);
 
-    int findInsertIndex(int KeyInt, LeafNodeInt *curNode);
+    /**
+     * @brief find where this key/rid pair will be going in the input leaf node
+     * 
+     * @param KeyInt - key to be inserted
+     * @param curNode - node being inserted into
+     * @return int - index of where the key would be inserted 
+     */
+    int findInsertIndex(int KeyInt, LeafNodeInt* curNode);
 
-    int findInsertIndexArr(int keyInt, int *arr);
+    /**
+     * @brief same as findInsertIndex except just for an array of ints
+     * 
+     * @param keyInt - key to be inserted
+     * @param arr - arrray that holds keys
+     * @return int - index of where key would be inserted
+     */
+    int findInsertIndexArr(int keyInt, int* arr);
 
-    int findInsertIndexSplit(int keyInt, LeafNodeInt *curNode);
+    /**
+     * @brief finds the insert index when we need to split 
+     * 
+     * @param keyInt - key to be inserted
+     * @param curNode - node that is being inserted into
+     * @return int - index of where the key would be inserted
+     */
+    int findInsertIndexSplit(int keyInt, LeafNodeInt* curNode);
 
-    void insertHelper(bool regular, int index, int keyInt, RecordId rid, NonLeafNodeInt *root, LeafNodeInt *firstNode);
+    /**
+     * @brief actuallu inserts key/rid pair into a node at the correct position
+     * 
+     * @param regular - whether or not this is being called after the first node is complete
+     * @param index - index the key is to be inserted
+     * @param keyInt - key to be inserted
+     * @param rid - rid to be inserted
+     * @param root - root of the index
+     * @param firstNode - node of first node of root
+     */
+    void insertHelper(bool regular, int index, int keyInt, RecordId rid, NonLeafNodeInt* root, LeafNodeInt* firstNode);
 
-    void insertHelperArr(int index, int keyInt, int *arr, RecordId *arrR, RecordId rid);
 
-    void NonLeafNodeInsertHelper(int index, int keyInt, PageId pageNo, NonLeafNodeInt *leafHolder);
+    /**
+     * @brief same as insert helper but just for an int array
+     * 
+     * @param index - index to be inserted at
+     * @param keyInt - key to be inserted
+     * @param arr - array to be inserted into
+     * @param arrR - arrray of records
+     * @param rid - rid to be inserted
+     */
+    void insertHelperArr(int index, int keyInt, int* arr, RecordId* arrR, RecordId rid);
 
-    void findPlace(int keyInt, NonLeafNodeInt *curRoot, PageId curRootPageId, int &index, NonLeafNodeInt *&leafHolder, PageId &leafHolderPageId);
+    /**
+     * @brief same as insert helper but for inserting into a non leaf node
+     * 
+     * @param index - the index to be inserted at
+     * @param keyInt - the key to be inserted
+     * @param pageNo - the page number to be inserted
+     * @param leafHolder - the nonLeafNode that holds the leaf
+     */
+    void NonLeafNodeInsertHelper(int index, int keyInt, PageId pageNo, NonLeafNodeInt* leafHolder);
 
-    bool easyInsert(int keyInt, RecordId rid, NonLeafNodeInt *root, int index, NonLeafNodeInt *leafHolder);
+    /**
+     * @brief recursive function to traverse tree and find in logn pages
+     * 
+     * @param keyInt - the key trying to find
+     * @param curRoot - the nonleaf node we are searching from
+     * @param curRootPageId - current page no of curroot
+     * @param index - the index that we need to insert at
+     * @param leafHolder - the nonleafnode that holds the leaf we need to insert into
+     * @param leafHolderPageId - the page no of above 
+     */
+    void findPlace(int keyInt, NonLeafNodeInt* curRoot, PageId curRootPageId, int& index, NonLeafNodeInt*& leafHolder, PageId& leafHolderPageId);
+
+    /**
+     * @brief hanles insert if there are no splits invloved
+     * 
+     * @param keyInt - key to be inserted 
+     * @param rid - rid to be inserted
+     * @param root - root of tree
+     * @param index - index to be inserted at
+     * @param leafHolder - nonleafnode that  holds leaf to be inserrted at
+     * @return true - whether a splitless insert occured
+     * @return false - whether a splitless insert occured
+     */
+    bool easyInsert(int keyInt, RecordId rid, NonLeafNodeInt* root, int index, NonLeafNodeInt* leafHolder);
   };
 
 }
