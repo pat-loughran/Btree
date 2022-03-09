@@ -90,7 +90,7 @@ void test2();
 void test3();
 void test4();
 void testNegative();
-void testEmpyTree();
+void testEmptyTree();
 void testNonLeafSplit();
 void errorTests();
 void deleteRelation();
@@ -158,7 +158,7 @@ int main(int argc, char **argv)
     test2();
     test3();
 	testNegative();
-	testEmpyTree();
+	testEmptyTree();
 	//testNonLeafSplit(); //too long to run
     errorTests();
 
@@ -200,7 +200,11 @@ void test3()
     deleteRelation();
 }
 
-
+/**
+ * Checking for negative numbers was tested since are implementation
+ * was supposed to not behave differently when processing
+ * negative number, i.e, our logic should also work for negative numbers.
+ */
 void testNegative()
 {
     std::cout << "---------------------" << std::endl;
@@ -210,7 +214,11 @@ void testNegative()
 	deleteRelation(); 
 }
 
-void testEmpyTree()
+/**
+ * We wrote this test to check that our scan methods could handle
+ * a tree index made from a file with no records.
+ */
+void testEmptyTree()
 {
 	std::cout << "--------------------" << std::endl;
     std::cout << "createBackward with size 0" << std::endl;
@@ -219,7 +227,10 @@ void testEmpyTree()
 	deleteRelation();
 
 }
-
+/**
+ * Tested the splitting of non leaf node to verify our index implementation
+ *   is capable of indexing a large amount of relations.
+ */
 void testNonLeafSplit() {
 	std::cout << "---------------------" << std::endl;
 	std::cout << "extra test for split in non-leaf node" << std::endl;
