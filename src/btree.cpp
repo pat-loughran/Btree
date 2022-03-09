@@ -618,6 +618,8 @@ void BTreeIndex::startScan(const void* lowValParm,
 				   const void* highValParm,
 				   const Operator highOpParm)
 {
+
+       
     lowValInt = *((int*)lowValParm);
     highValInt = *((int*)highValParm);
     if ((lowOpParm == LT || lowOpParm == LTE) || (highOpParm == GT || highOpParm == GTE)) {
@@ -634,6 +636,8 @@ void BTreeIndex::startScan(const void* lowValParm,
         endScan();
     }
 
+
+
     locatePage(rootPageNum);
     bufMgr->readPage(file, currentPageNum, currentPageData);
      LeafNodeInt* node = ( LeafNodeInt*)(currentPageData);
@@ -647,6 +651,7 @@ void BTreeIndex::startScan(const void* lowValParm,
         || ((lowOp == GT && highOp == LT) && (node->keyArray[i]< highValInt && node->keyArray[i] > lowValInt))
         )
         {
+
             bufMgr->unPinPage(file, currentPageNum, false);
             nextEntry = i;
             scanExecuting = true;
@@ -664,10 +669,9 @@ void BTreeIndex::startScan(const void* lowValParm,
 
 void BTreeIndex::scanNext(RecordId& outRid) 
 {
-    if (scanExecuting)
+    if (scanExecuting == true)
     {
          LeafNodeInt* node = ( LeafNodeInt*)(currentPageData);
-
 
         if (node->keyArray[nextEntry] == INT_MAX)
         {
